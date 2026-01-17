@@ -165,6 +165,9 @@ SQLite is configured by default. No additional setup required.
 - `npm start` - Start production server
 - `npm run lint` - Run ESLint
 - `npm run type-check` - Run TypeScript type checking
+- `npm test` - Run unit tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
 - `npm run db:push` - Push schema to database
 - `npm run db:migrate` - Create and run migrations
 - `npm run db:studio` - Open Prisma Studio
@@ -257,13 +260,62 @@ The quote calculation considers:
 
 ## STL Parser
 
-Supports both Binary and ASCII STL formats:
+The enhanced STL parser supports both Binary and ASCII STL formats with robust error handling:
 
-- Automatic format detection
+### Features
+- Automatic format detection (Binary vs ASCII)
 - Volume calculation using divergence theorem
-- Surface area calculation
+- Surface area calculation using cross product
 - Bounding box extraction
-- File validation
+- Estimated print time calculation
+- Comprehensive file validation
+- Error handling for corrupted files
+- Support for NaN and invalid vertex detection
+- Warnings for edge cases
+
+### Print Time Estimation
+The parser can estimate print time based on:
+- Model volume
+- Infill percentage (configurable)
+- Print speed (configurable, default 10 cm³/hour)
+- Overhead for layer changes and travel moves
+
+### Error Handling
+Robust error handling for:
+- Empty or invalid files
+- Files too small to be valid STL
+- Corrupted triangle data
+- NaN or Infinity values in vertices
+- Invalid file sizes
+- Malformed ASCII STL (missing endsolid)
+- Invalid triangle counts
+
+## Testing
+
+Comprehensive unit tests are included for the STL parser:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Test Coverage
+- Binary STL parsing (various sizes and edge cases)
+- ASCII STL parsing (various formats)
+- Error handling (corrupted files, NaN values, etc.)
+- Volume and surface area calculations
+- Print time estimation
+- Format detection
+- Validation logic
+- Performance benchmarks
+
+See `src/utils/__tests__/README.md` for detailed testing documentation.
 
 ## Customization
 
