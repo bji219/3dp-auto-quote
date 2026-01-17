@@ -246,17 +246,78 @@ Verify email address.
 }
 ```
 
-## Pricing Logic
+## Pricing Calculator
 
-The quote calculation considers:
+The enhanced pricing calculator provides itemized cost breakdowns with support for multiple materials, complexity analysis, and shipping calculations.
 
-1. **Base Cost**: Volume × Base price per cm³
-2. **Material Cost**: Material multiplier × Material cost multiplier
-3. **Infill Adjustment**: Higher infill = more material
-4. **Quality Multiplier**: Draft (0.8×), Standard (1.0×), High (1.4×)
-5. **Labor Cost**: Estimated print time × Labor rate per hour
-6. **Rush Order**: 1.5× multiplier if selected
-7. **Volume Discounts**: Applied automatically for larger orders
+### Supported Materials
+
+- **PLA** ($0.04/cm³) - Easy to print, biodegradable, great for beginners
+- **ABS** ($0.05/cm³) - Durable, heat-resistant, good for functional parts
+- **PETG** ($0.06/cm³) - Strong, flexible, chemical resistant
+- **TPU** ($0.12/cm³) - Flexible, elastic, rubber-like properties
+- **Nylon** ($0.15/cm³) - Very strong, wear-resistant, ideal for mechanical parts
+- **Carbon Fiber** ($0.25/cm³) - Extremely strong, lightweight, premium material
+- **Resin** ($0.18/cm³) - High detail, smooth surface, great for miniatures
+
+### Itemized Cost Breakdown
+
+Each quote includes:
+
+1. **Setup Fee** - One-time setup cost per order ($5.00)
+2. **Material Cost** - Volume × Material price per cm³ × Infill multiplier
+3. **Labor Cost** - Estimated print time × Labor rate ($25/hour)
+4. **Machine Cost** - Estimated print time × Machine rate ($5/hour)
+5. **Complexity Surcharge** - Applied for models with SA/V ratio > 8 (25% surcharge)
+6. **Shipping Cost** - Based on weight and dimensions (free shipping over $100)
+7. **Volume Discounts** - Automatic discounts for larger orders:
+   - 100+ cm³: 5% off
+   - 200+ cm³: 10% off
+   - 500+ cm³: 15% off
+   - 1000+ cm³: 20% off
+8. **Rush Order Fee** - $15 flat fee for expedited orders
+9. **Tax** - Configurable tax rate (default: 0%)
+
+### Complexity Analysis
+
+Models are automatically analyzed for complexity:
+
+| Surface/Volume Ratio | Level | Surcharge |
+|---------------------|-------|-----------|
+| < 5 | Simple | None |
+| 5-8 | Moderate | None |
+| 8-12 | Complex | 25% |
+| > 12 | Very Complex | 25% |
+
+### Shipping Calculation
+
+Shipping cost based on:
+- **Base Rate**: $5.00
+- **Weight**: $2.50 per kg
+- **Size**: $0.10 per cm of max dimension
+- **Free Shipping**: Orders over $100
+
+### Quality Multipliers
+
+- **Draft** (0.8×) - 20% faster, lower detail
+- **Standard** (1.0×) - Balanced speed and quality
+- **High** (1.4×) - 40% slower, highest detail
+
+### Configurable Parameters
+
+All pricing parameters can be customized via configuration:
+
+```typescript
+const customConfig = {
+  baseSetupFee: 10.0,
+  laborRatePerHour: 30.0,
+  shippingEnabled: true,
+  taxRate: 0.08, // 8% tax
+  // ... and many more options
+};
+
+const quote = calculateDetailedQuote(stlData, { config: customConfig });
+```
 
 ## STL Parser
 
