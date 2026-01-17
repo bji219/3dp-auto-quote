@@ -64,6 +64,7 @@ export interface UploadResponse {
   success: boolean;
   message: string;
   data?: {
+    fileId: string;
     fileName: string;
     fileSize: number;
     fileHash: string;
