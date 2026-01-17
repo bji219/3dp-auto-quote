@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  // For PostgreSQL, use: provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Quote {
+  id                String   @id @default(cuid())
+  email             String
+  emailVerified     Boolean  @default(false)
+  verificationToken String?
+
+  // File information
+  fileName          String
+  fileSize          Int
+  fileHash          String?
+
+  // STL Analysis
+  volume            Float    // in cubic cm
+  surfaceArea       Float    // in square cm
+  boundingBox       Json     // {x, y, z} dimensions
+
+  // Pricing
+  material          String   @default("PLA")
+  infillPercentage  Int      @default(20)
+  quality           String   @default("standard") // draft, standard, high
+  color             String?
+  rushOrder         Boolean  @default(false)
+
+  baseCost          Float
+  materialCost      Float
+  laborCost         Float
+  totalCost         Float
+
+  // Quote status
+  status            String   @default("pending") // pending, verified, accepted, rejected, completed
+  validUntil        DateTime
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Material {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  costPerCm3  Float
+  density     Float   // g/cm³
+  color       String?
+  available   Boolean @default(true)
+  description String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PricingRule {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  ruleType    String  // volume_discount, rush_multiplier, quality_multiplier, etc.
+  parameters  Json    // flexible parameters for different rule types
+  active      Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
