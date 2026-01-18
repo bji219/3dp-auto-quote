@@ -5,6 +5,7 @@ import FileUploadZone from '@/components/FileUploadZone';
 import EmailVerification from '@/components/EmailVerification';
 import QuoteDisplay from '@/components/QuoteDisplay';
 import ModelPreview from '@/components/ModelPreview';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { STLData } from '@/types';
 
 type FlowStep = 'upload' | 'preview' | 'verify' | 'quote';
@@ -142,46 +143,53 @@ export default function QuotePage() {
 
         <main>
           {currentStep === 'upload' && (
-            <div className="max-w-2xl mx-auto">
-              <FileUploadZone
-                onUploadComplete={handleUploadComplete}
-                onError={handleError}
-              />
-            </div>
+            <ErrorBoundary>
+              <div className="max-w-2xl mx-auto">
+                <FileUploadZone
+                  onUploadComplete={handleUploadComplete}
+                  onError={handleError}
+                />
+              </div>
+            </ErrorBoundary>
           )}
 
           {currentStep === 'preview' && uploadedFile && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <ModelPreview
-                fileId={uploadedFile.fileId}
-                fileName={uploadedFile.fileName}
-              />
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setCurrentStep('verify')}
-                  className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors"
-                >
-                  Continue to Verification
-                </button>
+            <ErrorBoundary>
+              <div className="max-w-4xl mx-auto space-y-6">
+                <ModelPreview
+                  fileId={uploadedFile.fileId}
+                  fileName={uploadedFile.fileName}
+                />
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => setCurrentStep('verify')}
+                    className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition-colors"
+                  >
+                    Continue to Verification
+                  </button>
+                </div>
               </div>
-            </div>
+            </ErrorBoundary>
           )}
 
           {currentStep === 'verify' && (
-            <EmailVerification
-              onVerificationComplete={handleVerificationComplete}
-              onError={handleError}
-            />
+            <ErrorBoundary>
+              <EmailVerification
+                onVerificationComplete={handleVerificationComplete}
+                onError={handleError}
+              />
+            </ErrorBoundary>
           )}
 
           {currentStep === 'quote' && uploadedFile && sessionToken && (
-            <div className="space-y-6">
-              <QuoteDisplay
-                stlData={uploadedFile.stlData}
-                fileId={uploadedFile.fileId}
-                sessionToken={sessionToken}
-                onQuoteGenerated={handleQuoteGenerated}
-              />
+            <ErrorBoundary>
+              <div className="space-y-6">
+                <QuoteDisplay
+                  stlData={uploadedFile.stlData}
+                  fileId={uploadedFile.fileId}
+                  sessionToken={sessionToken}
+                  onQuoteGenerated={handleQuoteGenerated}
+                />
               
               {generatedQuoteId && (
                 <div className="max-w-4xl mx-auto">
@@ -230,7 +238,8 @@ export default function QuotePage() {
                   </div>
                 </div>
               )}
-            </div>
+              </div>
+            </ErrorBoundary>
           )}
         </main>
 
