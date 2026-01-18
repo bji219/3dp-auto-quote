@@ -17,8 +17,10 @@ model Quote {
   emailVerified     Boolean  @default(false)
   verificationToken String?
 
-  // File information
+  // File information (links to FileUpload)
+  fileId            String?
   fileName          String
+  filePath          String?  // Storage path for the file
   fileSize          Int
   fileHash          String?
 
@@ -43,6 +45,10 @@ model Quote {
   status            String   @default("pending") // pending, verified, accepted, rejected, completed
   validUntil        DateTime
 
+  // Metadata
+  ipAddress         String?
+  userAgent         String?
+
   // Timestamps
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -50,6 +56,7 @@ model Quote {
   @@index([email])
   @@index([status])
   @@index([createdAt])
+  @@index([fileId])
 }
 
 model Material {
@@ -144,4 +151,41 @@ model MailingListSubscriber {
 
   @@index([email])
   @@index([isSubscribed])
+}
+
+model FileUpload {
+  id            String   @id @default(cuid())
+  fileId        String   @unique // Custom file identifier (e.g., file_1234567890_abc123)
+  fileName      String   // Original filename
+  filePath      String   // Storage path (local or S3)
+  fileSize      Int      // Size in bytes
+  fileHash      String   // SHA256 hash for deduplication
+  mimeType      String   @default("application/sla")
+  storageType   String   @default("local") // local, s3, gcs, etc.
+
+  // STL Metrics (cached)
+  volume        Float?
+  surfaceArea   Float?
+  boundingBox   Json?
+
+  // Metadata
+  uploadedBy    String?  // Email or user identifier
+  ipAddress     String?
+  userAgent     String?
+
+  // Cleanup tracking
+  lastAccessedAt DateTime @default(now())
+  markedForDeletion Boolean @default(false)
+  deletedAt     DateTime?
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([fileId])
+  @@index([fileHash])
+  @@index([uploadedBy])
+  @@index([createdAt])
+  @@index([lastAccessedAt])
+  @@index([markedForDeletion])
 }

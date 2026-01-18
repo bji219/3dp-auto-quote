@@ -3,65 +3,65 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding database...');
+  console.log('Start seeding...');
 
   // Seed materials
   const materials = [
     {
       name: 'PLA',
-      costPerCm3: 0.15,
+      costPerCm3: 0.04,
       density: 1.24,
       color: 'Various',
       available: true,
-      description: 'Biodegradable, easy to print, good for prototypes',
+      description: 'Best for prototypes and general use. Easy to print, biodegradable.',
     },
     {
       name: 'ABS',
-      costPerCm3: 0.18,
-      density: 1.04,
+      costPerCm3: 0.05,
+      density: 1.05,
       color: 'Various',
       available: true,
-      description: 'Strong, heat resistant, suitable for functional parts',
+      description: 'Strong and heat-resistant. Good for functional parts.',
     },
     {
       name: 'PETG',
-      costPerCm3: 0.20,
+      costPerCm3: 0.06,
       density: 1.27,
       color: 'Various',
       available: true,
-      description: 'Durable, flexible, food-safe option',
+      description: 'Durable and chemical resistant. Good layer adhesion.',
     },
     {
       name: 'TPU',
-      costPerCm3: 0.27,
+      costPerCm3: 0.08,
       density: 1.21,
       color: 'Various',
       available: true,
-      description: 'Flexible, rubber-like material',
+      description: 'Flexible and elastic. Perfect for parts requiring flexibility.',
     },
     {
       name: 'Nylon',
-      costPerCm3: 0.30,
+      costPerCm3: 0.10,
       density: 1.14,
-      color: 'Natural',
+      color: 'Natural/Black',
       available: true,
-      description: 'Very strong and durable',
+      description: 'Very strong and durable. Excellent for mechanical parts.',
     },
     {
       name: 'Carbon Fiber',
-      costPerCm3: 0.52,
+      costPerCm3: 0.15,
       density: 1.30,
       color: 'Black',
       available: true,
-      description: 'Extremely strong and lightweight',
+      description: 'Extremely strong and lightweight. Ideal for high-performance parts.',
     },
     {
       name: 'Resin',
-      costPerCm3: 0.37,
-      density: 1.15,
+      costPerCm3: 0.12,
+      density: 1.10,
       color: 'Various',
       available: true,
-      description: 'High detail, smooth surface finish',
+      description: 'Highest detail and smooth finish. Perfect for miniatures and jewelry.',
     },
   ];
 
@@ -73,46 +73,70 @@ async function main() {
     });
   }
 
-  console.log('Materials seeded');
+  console.log('Created materials:', materials.length);
 
   // Seed pricing rules
   const pricingRules = [
     {
-      name: 'Volume Discount - Small',
+      name: 'Volume Discount Tier 1',
       ruleType: 'volume_discount',
       parameters: {
         minVolume: 100,
-        maxVolume: 200,
-        discount: 0.05,
+        discountPercent: 5,
       },
       active: true,
     },
     {
-      name: 'Volume Discount - Medium',
-      ruleType: 'volume_discount',
-      parameters: {
-        minVolume: 200,
-        maxVolume: 500,
-        discount: 0.10,
-      },
-      active: true,
-    },
-    {
-      name: 'Volume Discount - Large',
+      name: 'Volume Discount Tier 2',
       ruleType: 'volume_discount',
       parameters: {
         minVolume: 500,
-        maxVolume: 1000,
-        discount: 0.15,
+        discountPercent: 10,
       },
       active: true,
     },
     {
-      name: 'Volume Discount - Extra Large',
+      name: 'Volume Discount Tier 3',
       ruleType: 'volume_discount',
       parameters: {
         minVolume: 1000,
-        discount: 0.20,
+        discountPercent: 15,
+      },
+      active: true,
+    },
+    {
+      name: 'Rush Order Multiplier',
+      ruleType: 'rush_multiplier',
+      parameters: {
+        multiplier: 1.5,
+        flatFee: 25,
+      },
+      active: true,
+    },
+    {
+      name: 'Quality Multiplier - Draft',
+      ruleType: 'quality_multiplier',
+      parameters: {
+        quality: 'draft',
+        multiplier: 0.8,
+      },
+      active: true,
+    },
+    {
+      name: 'Quality Multiplier - Standard',
+      ruleType: 'quality_multiplier',
+      parameters: {
+        quality: 'standard',
+        multiplier: 1.0,
+      },
+      active: true,
+    },
+    {
+      name: 'Quality Multiplier - High',
+      ruleType: 'quality_multiplier',
+      parameters: {
+        quality: 'high',
+        multiplier: 1.3,
       },
       active: true,
     },
@@ -126,13 +150,14 @@ async function main() {
     });
   }
 
-  console.log('Pricing rules seeded');
-  console.log('Seeding complete!');
+  console.log('Created pricing rules:', pricingRules.length);
+
+  console.log('Seeding finished.');
 }
 
 main()
   .catch((e) => {
-    console.error('Error seeding database:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {
