@@ -8,8 +8,10 @@ export interface STLData {
     y: number;
     z: number;
   };
+  estimatedPrintTime?: number; // hours (baseline estimate)
   isValid: boolean;
   errors?: string[];
+  warnings?: string[];
 }
 
 export interface QuoteRequest {
@@ -62,6 +64,7 @@ export interface UploadResponse {
   success: boolean;
   message: string;
   data?: {
+    fileId: string;
     fileName: string;
     fileSize: number;
     fileHash: string;

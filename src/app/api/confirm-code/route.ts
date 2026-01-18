@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
-  createVerificationCode,
-  checkRateLimit,
+  verifyCode,
+  createUserSession,
   recordVerificationAttempt,
+  checkRateLimit,
 } from '@/utils/verification';
-import { sendVerificationCodeEmail } from '@/utils/email-service';
+import { subscribeToMailingList } from '@/utils/mailing-list';
+import { sendWelcomeEmail } from '@/utils/email-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const verifyEmailSchema = z.object({
+const confirmCodeSchema = z.object({
   email: z.string().email('Invalid email address'),
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be numeric'),
 });
 
 /**
- * POST /api/verify-email
- * Send a verification code to an email address
+ * POST /api/confirm-code
+ * Verify a code and return a session token
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const validation = verifyEmailSchema.safeParse(body);
+    const validation = confirmCodeSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email } = validation.data;
+    const { email, code } = validation.data;
     const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || undefined;
 
@@ -45,40 +48,53 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           message: 'Too many verification attempts. Please try again later.',
-          attemptsRemaining: 0,
           resetAt: rateLimit.resetAt.toISOString(),
         },
         { status: 429 }
       );
     }
 
-    const verification = await createVerificationCode(email, { ipAddress, userAgent });
-    const emailResult = await sendVerificationCodeEmail(email, verification.code, 15);
+    const verificationResult = await verifyCode(email, code);
+    await recordVerificationAttempt(email, verificationResult.success, ipAddress);
 
-    await recordVerificationAttempt(email, emailResult.success, ipAddress);
-
-    if (!emailResult.success) {
+    if (!verificationResult.success) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Failed to send verification email',
-          error: emailResult.error,
+          message: verificationResult.message,
+          attemptsRemaining: rateLimit.attemptsRemaining - 1,
         },
-        { status: 500 }
+        { status: 400 }
       );
+    }
+
+    const session = await createUserSession(email, { ipAddress, userAgent });
+
+    const mailingListResult = await subscribeToMailingList(email, {
+      source: 'email_verification',
+      tags: ['verified_user'],
+    });
+
+    if (mailingListResult.success) {
+      sendWelcomeEmail(email).catch((error) => {
+        console.error('Failed to send welcome email:', error);
+      });
     }
 
     return NextResponse.json(
       {
         success: true,
-        message: 'Verification code sent successfully',
-        expiresAt: verification.expiresAt.toISOString(),
-        attemptsRemaining: rateLimit.attemptsRemaining - 1,
+        message: 'Email verified successfully',
+        sessionToken: session.token,
+        expiresAt: session.expiresAt.toISOString(),
+        user: {
+          email,
+        },
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error('Verify email error:', error);
+    console.error('Confirm code error:', error);
     return NextResponse.json(
       {
         success: false,

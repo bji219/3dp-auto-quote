@@ -10,18 +10,22 @@ import { sendVerificationCodeEmail } from '@/utils/email-service';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const verifyEmailSchema = z.object({
+/**
+ * Request schema validation
+ */
+const sendCodeSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
 
 /**
- * POST /api/verify-email
+ * POST /api/auth/send-code
  * Send a verification code to an email address
  */
 export async function POST(request: NextRequest) {
   try {
+    // Parse and validate request body
     const body = await request.json();
-    const validation = verifyEmailSchema.safeParse(body);
+    const validation = sendCodeSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -35,16 +39,19 @@ export async function POST(request: NextRequest) {
     }
 
     const { email } = validation.data;
+
+    // Get client metadata
     const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || undefined;
 
+    // Check rate limiting
     const rateLimit = await checkRateLimit(email, ipAddress);
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Too many verification attempts. Please try again later.',
+          message: `Too many verification attempts. Please try again later.`,
           attemptsRemaining: 0,
           resetAt: rateLimit.resetAt.toISOString(),
         },
@@ -52,9 +59,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const verification = await createVerificationCode(email, { ipAddress, userAgent });
-    const emailResult = await sendVerificationCodeEmail(email, verification.code, 15);
+    // Create verification code
+    const verification = await createVerificationCode(email, {
+      ipAddress,
+      userAgent,
+    });
 
+    // Send email
+    const emailResult = await sendVerificationCodeEmail(
+      email,
+      verification.code,
+      15 // 15 minutes expiry
+    );
+
+    // Record the attempt
     await recordVerificationAttempt(email, emailResult.success, ipAddress);
 
     if (!emailResult.success) {
@@ -78,7 +96,7 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Verify email error:', error);
+    console.error('Send code error:', error);
     return NextResponse.json(
       {
         success: false,

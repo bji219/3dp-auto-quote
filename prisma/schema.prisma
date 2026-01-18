@@ -75,3 +75,73 @@ model PricingRule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model EmailVerification {
+  id          String   @id @default(cuid())
+  email       String
+  code        String   // 6-digit code
+  expiresAt   DateTime // Expires in 15 minutes
+  verified    Boolean  @default(false)
+  verifiedAt  DateTime?
+
+  // Metadata
+  ipAddress   String?
+  userAgent   String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model VerificationAttempt {
+  id          String   @id @default(cuid())
+  email       String
+  ipAddress   String?
+  successful  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+model UserSession {
+  id          String   @id @default(cuid())
+  email       String
+  token       String   @unique
+  expiresAt   DateTime // Session expiry (e.g., 24 hours)
+  isActive    Boolean  @default(true)
+
+  // Metadata
+  ipAddress   String?
+  userAgent   String?
+  lastActivity DateTime @default(now())
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model MailingListSubscriber {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  isSubscribed  Boolean  @default(true)
+  source        String?  // Where they subscribed from (e.g., 'quote_request', 'newsletter')
+  tags          Json?    // Flexible tags for segmentation
+
+  // Metadata
+  subscribedAt  DateTime @default(now())
+  unsubscribedAt DateTime?
+  lastEmailSent DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([email])
+  @@index([isSubscribed])
+}
