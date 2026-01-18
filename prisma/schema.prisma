@@ -27,7 +27,7 @@ model Quote {
   // STL Analysis
   volume            Float    // in cubic cm
   surfaceArea       Float    // in square cm
-  boundingBox       Json     // {x, y, z} dimensions
+  boundingBox       String   // JSON string: {x, y, z} dimensions
 
   // Pricing
   material          String   @default("PLA")
@@ -76,7 +76,7 @@ model PricingRule {
   id          String  @id @default(cuid())
   name        String  @unique
   ruleType    String  // volume_discount, rush_multiplier, quality_multiplier, etc.
-  parameters  Json    // flexible parameters for different rule types
+  parameters  String  // JSON string: flexible parameters for different rule types
   active      Boolean @default(true)
 
   createdAt   DateTime @default(now())
@@ -139,7 +139,7 @@ model MailingListSubscriber {
   email         String   @unique
   isSubscribed  Boolean  @default(true)
   source        String?  // Where they subscribed from (e.g., 'quote_request', 'newsletter')
-  tags          Json?    // Flexible tags for segmentation
+  tags          String?  // JSON string: Flexible tags for segmentation
 
   // Metadata
   subscribedAt  DateTime @default(now())
@@ -166,7 +166,7 @@ model FileUpload {
   // STL Metrics (cached)
   volume        Float?
   surfaceArea   Float?
-  boundingBox   Json?
+  boundingBox   String?  // JSON string: {x, y, z} dimensions
 
   // Metadata
   uploadedBy    String?  // Email or user identifier
