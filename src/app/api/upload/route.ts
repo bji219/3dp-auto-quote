@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
-import crypto from 'crypto';
 import { parseSTL, validateSTLData } from '@/utils/stl-parser';
-import { generateFileHash } from '@/utils/validation';
+import {
+  saveFileWithMetadata,
+  calculateFileHash,
+  generateFileId
+} from '@/utils/file-storage';
+import { prisma } from '@/lib/prisma';
 import { UploadResponse } from '@/types';
 
 export const runtime = 'nodejs';
@@ -12,27 +13,10 @@ export const dynamic = 'force-dynamic';
 
 // Configuration
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE_MB || '50') * 1024 * 1024;
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
-
-/**
- * Generate a unique file ID
- */
-function generateFileId(): string {
-  return `file_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-}
-
-/**
- * Ensure upload directory exists
- */
-async function ensureUploadDir(): Promise<void> {
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true });
-  }
-}
 
 /**
  * POST /api/upload
- * Upload and parse STL file, returns file ID and metrics
+ * Upload and parse STL file, saves to storage and database
  */
 export async function POST(request: NextRequest) {
   try {
@@ -99,8 +83,9 @@ export async function POST(request: NextRequest) {
 
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    // Parse STL file
+    // Parse STL file first (to validate before saving)
     const stlData = await parseSTL(arrayBuffer);
 
     // Validate parsed data
@@ -116,27 +101,67 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate file hash
-    const fileHash = await generateFileHash(arrayBuffer);
+    // Get request metadata
+    const ipAddress = request.headers.get('x-forwarded-for') ||
+                     request.headers.get('x-real-ip') ||
+                     'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
 
-    // Generate unique file ID
-    const fileId = generateFileId();
-    const savedFileName = `${fileId}.stl`;
+    // Calculate file hash for deduplication
+    const fileHash = await calculateFileHash(buffer);
 
-    // Ensure upload directory exists
-    await ensureUploadDir();
+    // Check for existing file with same hash (deduplication)
+    const existingFile = await prisma.fileUpload.findFirst({
+      where: { fileHash },
+    });
 
-    // Save file to disk
-    const filePath = join(UPLOAD_DIR, savedFileName);
-    const buffer = Buffer.from(arrayBuffer);
-    await writeFile(filePath, buffer);
+    let fileRecord;
+
+    if (existingFile) {
+      // File already exists - update last accessed time and reuse
+      fileRecord = await prisma.fileUpload.update({
+        where: { id: existingFile.id },
+        data: { lastAccessedAt: new Date() },
+      });
+
+      console.log(`Reusing existing file: ${existingFile.fileId}`);
+    } else {
+      // New file - save to storage and database
+      const storageMetadata = await saveFileWithMetadata(
+        file.name,
+        buffer,
+        undefined, // uploadedBy (no user context yet)
+        ipAddress,
+        userAgent
+      );
+
+      // Save to database
+      fileRecord = await prisma.fileUpload.create({
+        data: {
+          fileId: storageMetadata.fileId,
+          fileName: storageMetadata.fileName,
+          filePath: storageMetadata.filePath,
+          fileSize: storageMetadata.fileSize,
+          fileHash: storageMetadata.fileHash,
+          mimeType: storageMetadata.mimeType,
+          storageType: storageMetadata.storageType,
+          volume: stlData.volume,
+          surfaceArea: stlData.surfaceArea,
+          boundingBox: stlData.boundingBox,
+          ipAddress,
+          userAgent,
+        },
+      });
+    }
 
     return NextResponse.json<UploadResponse>(
       {
         success: true,
-        message: 'File uploaded and parsed successfully',
+        message: existingFile
+          ? 'File already exists, reusing cached version'
+          : 'File uploaded and parsed successfully',
         data: {
-          fileId,
+          fileId: fileRecord.fileId,
           fileName: file.name,
           fileSize: file.size,
           fileHash,

@@ -51,14 +51,12 @@ export async function POST(request: NextRequest) {
 
     const { fileId, material, infillPercentage, quality, rushOrder, color } = validation.data;
 
-    // Construct file path
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    const filePath = path.join(uploadsDir, `${fileId}.stl`);
+    // Check FileUpload record exists
+    const fileRecord = await prisma.fileUpload.findUnique({
+      where: { fileId },
+    });
 
-    // Check if file exists
-    try {
-      await fs.access(filePath);
-    } catch (error) {
+    if (!fileRecord) {
       return NextResponse.json(
         {
           success: false,
@@ -69,21 +67,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read and parse STL file
-    const fileBuffer = await fs.readFile(filePath);
-    const arrayBuffer = fileBuffer.buffer.slice(
-      fileBuffer.byteOffset,
-      fileBuffer.byteOffset + fileBuffer.byteLength
-    );
+    // Update last accessed time
+    await prisma.fileUpload.update({
+      where: { fileId },
+      data: { lastAccessedAt: new Date() },
+    });
 
-    const stlData = await parseSTL(arrayBuffer);
+    // Use cached STL data if available, otherwise parse file
+    let stlData;
 
-    // Calculate file hash for verification
-    const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    if (fileRecord.volume && fileRecord.surfaceArea && fileRecord.boundingBox) {
+      // Use cached metrics
+      stlData = {
+        volume: fileRecord.volume,
+        surfaceArea: fileRecord.surfaceArea,
+        boundingBox: fileRecord.boundingBox as { x: number; y: number; z: number },
+        estimatedPrintTime: 0, // Will be recalculated by pricing engine
+      };
+    } else {
+      // Read and parse STL file
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      const filePath = path.join(uploadsDir, fileRecord.filePath);
 
-    // Get file stats
-    const fileStats = await fs.stat(filePath);
-    const fileSize = fileStats.size;
+      const fileBuffer = await fs.readFile(filePath);
+      const arrayBuffer = fileBuffer.buffer.slice(
+        fileBuffer.byteOffset,
+        fileBuffer.byteOffset + fileBuffer.byteLength
+      );
+
+      stlData = await parseSTL(arrayBuffer);
+
+      // Update cached metrics
+      await prisma.fileUpload.update({
+        where: { fileId },
+        data: {
+          volume: stlData.volume,
+          surfaceArea: stlData.surfaceArea,
+          boundingBox: stlData.boundingBox,
+        },
+      });
+    }
 
     // Calculate detailed quote
     const quote = calculateDetailedQuote(stlData, {
@@ -98,14 +121,22 @@ export async function POST(request: NextRequest) {
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + 7);
 
+    // Get request metadata
+    const ipAddress = request.headers.get('x-forwarded-for') ||
+                     request.headers.get('x-real-ip') ||
+                     'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+
     // Save quote to database
     const savedQuote = await prisma.quote.create({
       data: {
         email,
         emailVerified: true, // User is authenticated
-        fileName: fileId,
-        fileSize,
-        fileHash,
+        fileId,
+        fileName: fileRecord.fileName,
+        filePath: fileRecord.filePath,
+        fileSize: fileRecord.fileSize,
+        fileHash: fileRecord.fileHash,
         
         // STL metrics
         volume: stlData.volume,
@@ -128,10 +159,14 @@ export async function POST(request: NextRequest) {
         materialCost: quote.breakdown.materialCost,
         laborCost: quote.breakdown.laborCost + quote.breakdown.machineCost,
         totalCost: quote.breakdown.total,
-        
+
         // Quote status
         status: 'pending',
         validUntil,
+
+        // Metadata
+        ipAddress,
+        userAgent,
       },
     });
 
