@@ -299,6 +299,21 @@ git pull origin main
 npm install
 ```
 
+### Issue: npm warnings about deprecated packages
+
+You may see some deprecation warnings during `npm install`. Most of these are harmless:
+
+**Expected warnings (safe to ignore):**
+- `eslint@8.57.1 is deprecated` - We're using ESLint 8 for stability. ESLint 9 has breaking changes.
+- `@humanwhocodes/*` packages - These are ESLint 8 dependencies, will be updated when we upgrade ESLint.
+- `whatwg-encoding`, `abab`, `domexception` - Minor dependencies from Jest/jsdom.
+
+**Fixed warnings:**
+- ✅ `glob@7.x.x is deprecated` - Fixed using npm overrides to force glob@10+
+- ✅ `rimraf@3.x.x is deprecated` - Fixed using npm overrides to force rimraf@5+
+
+The project uses npm `overrides` in `package.json` to ensure all dependencies use modern versions of glob and rimraf, even if their own package.json hasn't been updated yet.
+
 ### Issue: "Cannot find module '@prisma/client'"
 
 **Solution**: Generate the Prisma client:
