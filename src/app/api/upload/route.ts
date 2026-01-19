@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
           storageType: storageMetadata.storageType,
           volume: stlData.volume,
           surfaceArea: stlData.surfaceArea,
-          boundingBox: stlData.boundingBox,
+          boundingBox: JSON.stringify(stlData.boundingBox),
           ipAddress,
           userAgent,
         },

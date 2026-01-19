@@ -175,129 +175,12 @@ export class LocalStorage {
 }
 
 /**
- * S3-compatible storage operations (AWS S3, MinIO, etc.)
- * Note: Requires @aws-sdk/client-s3 to be installed
- */
-export class S3Storage {
-  private bucket: string;
-  private region: string;
-  private client: any; // S3Client from @aws-sdk/client-s3
-
-  constructor(config: StorageConfig) {
-    this.bucket = config.bucket || '';
-    this.region = config.region || 'us-east-1';
-
-    // Lazy load AWS SDK only when needed
-    // This prevents errors when S3 is not configured
-    if (config.type === 's3') {
-      try {
-        const { S3Client } = require('@aws-sdk/client-s3');
-        this.client = new S3Client({
-          region: this.region,
-          credentials: config.accessKeyId
-            ? {
-                accessKeyId: config.accessKeyId,
-                secretAccessKey: config.secretAccessKey || '',
-              }
-            : undefined,
-          endpoint: config.endpoint,
-        });
-      } catch (error) {
-        console.warn('AWS SDK not available. Install @aws-sdk/client-s3 for S3 storage.');
-      }
-    }
-  }
-
-  /**
-   * Save file to S3
-   */
-  async saveFile(fileId: string, fileName: string, buffer: Buffer): Promise<string> {
-    if (!this.client) {
-      throw new Error('S3 client not initialized');
-    }
-
-    const { PutObjectCommand } = require('@aws-sdk/client-s3');
-    const storagePath = getStoragePath(fileId, fileName);
-
-    const command = new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: storagePath,
-      Body: buffer,
-      ContentType: 'application/sla',
-    });
-
-    await this.client.send(command);
-    return storagePath;
-  }
-
-  /**
-   * Read file from S3
-   */
-  async readFile(storagePath: string): Promise<Buffer> {
-    if (!this.client) {
-      throw new Error('S3 client not initialized');
-    }
-
-    const { GetObjectCommand } = require('@aws-sdk/client-s3');
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: storagePath,
-    });
-
-    const response = await this.client.send(command);
-    const chunks: Uint8Array[] = [];
-
-    for await (const chunk of response.Body) {
-      chunks.push(chunk);
-    }
-
-    return Buffer.concat(chunks);
-  }
-
-  /**
-   * Delete file from S3
-   */
-  async deleteFile(storagePath: string): Promise<void> {
-    if (!this.client) {
-      throw new Error('S3 client not initialized');
-    }
-
-    const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
-    const command = new DeleteObjectCommand({
-      Bucket: this.bucket,
-      Key: storagePath,
-    });
-
-    await this.client.send(command);
-  }
-
-  /**
-   * Check if file exists in S3
-   */
-  async fileExists(storagePath: string): Promise<boolean> {
-    if (!this.client) {
-      throw new Error('S3 client not initialized');
-    }
-
-    const { HeadObjectCommand } = require('@aws-sdk/client-s3');
-    try {
-      const command = new HeadObjectCommand({
-        Bucket: this.bucket,
-        Key: storagePath,
-      });
-      await this.client.send(command);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
-/**
  * Get storage instance based on configuration
  */
-export function getStorage(): LocalStorage | S3Storage {
+export async function getStorage(): Promise<LocalStorage | any> {
   if (STORAGE_CONFIG.type === 's3') {
+    // Dynamically import S3Storage only when needed
+    const { S3Storage } = await import('./s3-storage');
     return new S3Storage(STORAGE_CONFIG);
   }
   return new LocalStorage(STORAGE_CONFIG.basePath);
@@ -316,7 +199,7 @@ export async function saveFileWithMetadata(
   const fileId = generateFileId();
   const fileHash = await calculateFileHash(buffer);
   const fileSize = buffer.length;
-  const storage = getStorage();
+  const storage = await getStorage();
 
   const filePath = await storage.saveFile(fileId, fileName, buffer);
 
@@ -335,7 +218,7 @@ export async function saveFileWithMetadata(
  * Delete file by ID
  */
 export async function deleteFileById(fileId: string, fileName: string): Promise<void> {
-  const storage = getStorage();
+  const storage = await getStorage();
   const storagePath = getStoragePath(fileId, fileName);
   await storage.deleteFile(storagePath);
 }

@@ -80,64 +80,64 @@ async function main() {
     {
       name: 'Volume Discount Tier 1',
       ruleType: 'volume_discount',
-      parameters: {
+      parameters: JSON.stringify({
         minVolume: 100,
         discountPercent: 5,
-      },
+      }),
       active: true,
     },
     {
       name: 'Volume Discount Tier 2',
       ruleType: 'volume_discount',
-      parameters: {
+      parameters: JSON.stringify({
         minVolume: 500,
         discountPercent: 10,
-      },
+      }),
       active: true,
     },
     {
       name: 'Volume Discount Tier 3',
       ruleType: 'volume_discount',
-      parameters: {
+      parameters: JSON.stringify({
         minVolume: 1000,
         discountPercent: 15,
-      },
+      }),
       active: true,
     },
     {
       name: 'Rush Order Multiplier',
       ruleType: 'rush_multiplier',
-      parameters: {
+      parameters: JSON.stringify({
         multiplier: 1.5,
         flatFee: 25,
-      },
+      }),
       active: true,
     },
     {
       name: 'Quality Multiplier - Draft',
       ruleType: 'quality_multiplier',
-      parameters: {
+      parameters: JSON.stringify({
         quality: 'draft',
         multiplier: 0.8,
-      },
+      }),
       active: true,
     },
     {
       name: 'Quality Multiplier - Standard',
       ruleType: 'quality_multiplier',
-      parameters: {
+      parameters: JSON.stringify({
         quality: 'standard',
         multiplier: 1.0,
-      },
+      }),
       active: true,
     },
     {
       name: 'Quality Multiplier - High',
       ruleType: 'quality_multiplier',
-      parameters: {
+      parameters: JSON.stringify({
         quality: 'high',
         multiplier: 1.3,
-      },
+      }),
       active: true,
     },
   ];

@@ -81,7 +81,9 @@ export async function POST(request: NextRequest) {
       stlData = {
         volume: fileRecord.volume,
         surfaceArea: fileRecord.surfaceArea,
-        boundingBox: fileRecord.boundingBox as { x: number; y: number; z: number },
+        boundingBox: typeof fileRecord.boundingBox === 'string'
+          ? JSON.parse(fileRecord.boundingBox)
+          : fileRecord.boundingBox as { x: number; y: number; z: number },
         estimatedPrintTime: 0, // Will be recalculated by pricing engine
       };
     } else {
@@ -141,11 +143,11 @@ export async function POST(request: NextRequest) {
         // STL metrics
         volume: stlData.volume,
         surfaceArea: stlData.surfaceArea,
-        boundingBox: {
+        boundingBox: JSON.stringify({
           x: stlData.boundingBox.x,
           y: stlData.boundingBox.y,
           z: stlData.boundingBox.z,
-        },
+        }),
         
         // Pricing options
         material,
