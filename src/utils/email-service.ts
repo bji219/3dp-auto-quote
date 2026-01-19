@@ -1,5 +1,3 @@
-import { Resend } from 'resend';
-
 /**
  * Email service configuration
  */
@@ -20,18 +18,19 @@ type EmailService = 'resend' | 'sendgrid' | 'smtp';
  * Get the configured email service
  */
 function getEmailService(): EmailService {
-  if (EMAIL_CONFIG.RESEND_API_KEY) return 'resend';
-  if (EMAIL_CONFIG.SENDGRID_API_KEY) return 'sendgrid';
+  if (EMAIL_CONFIG.RESEND_API_KEY && EMAIL_CONFIG.RESEND_API_KEY !== 're_xxxxxxxxxx') return 'resend';
+  if (EMAIL_CONFIG.SENDGRID_API_KEY && EMAIL_CONFIG.SENDGRID_API_KEY !== 'SG.xxxxxxxxxx') return 'sendgrid';
   return 'smtp';
 }
 
 /**
- * Initialize Resend client
+ * Initialize Resend client lazily
  */
-let resendClient: Resend | null = null;
+let resendClient: any = null;
 
-function getResendClient(): Resend {
+async function getResendClient(): Promise<any> {
   if (!resendClient && EMAIL_CONFIG.RESEND_API_KEY) {
+    const { Resend } = await import('resend');
     resendClient = new Resend(EMAIL_CONFIG.RESEND_API_KEY);
   }
   if (!resendClient) {
@@ -49,7 +48,7 @@ async function sendVerificationEmailViaResend(
   expiresInMinutes: number = 15
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const resend = getResendClient();
+    const resend = await getResendClient();
 
     const { data, error } = await resend.emails.send({
       from: `${EMAIL_CONFIG.FROM_NAME} <${EMAIL_CONFIG.FROM_EMAIL}>`,
@@ -82,41 +81,17 @@ async function sendVerificationEmailViaResend(
 
 /**
  * Send verification code email using SendGrid
+ * Note: SendGrid package not installed. Install @sendgrid/mail to use this service.
  */
 async function sendVerificationEmailViaSendGrid(
   email: string,
   code: string,
   expiresInMinutes: number = 15
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  try {
-    // SendGrid implementation
-    const sgMail = require('@sendgrid/mail');
-    sgMail.setApiKey(EMAIL_CONFIG.SENDGRID_API_KEY);
-
-    const msg = {
-      to: email,
-      from: {
-        email: EMAIL_CONFIG.FROM_EMAIL,
-        name: EMAIL_CONFIG.FROM_NAME,
-      },
-      subject: `Your verification code: ${code}`,
-      text: getVerificationEmailText(code, expiresInMinutes),
-      html: getVerificationEmailHTML(code, expiresInMinutes),
-    };
-
-    const response = await sgMail.send(msg);
-
-    return {
-      success: true,
-      messageId: response[0].headers['x-message-id'],
-    };
-  } catch (error) {
-    console.error('Failed to send email via SendGrid:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
+  return {
+    success: false,
+    error: 'SendGrid is not configured. Install @sendgrid/mail package to use this service.',
+  };
 }
 
 /**
@@ -128,7 +103,8 @@ async function sendVerificationEmailViaSMTP(
   expiresInMinutes: number = 15
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const nodemailer = require('nodemailer');
+    const nodemailerModule = await import('nodemailer');
+    const nodemailer = nodemailerModule.default || nodemailerModule;
 
     const transporter = nodemailer.createTransporter({
       host: process.env.EMAIL_HOST,
@@ -361,19 +337,11 @@ If you have any questions, feel free to reach out to us.
         break;
       }
       case 'sendgrid': {
-        const sgMail = require('@sendgrid/mail');
-        sgMail.setApiKey(EMAIL_CONFIG.SENDGRID_API_KEY);
-        await sgMail.send({
-          to: email,
-          from: { email: EMAIL_CONFIG.FROM_EMAIL, name: EMAIL_CONFIG.FROM_NAME },
-          subject: 'Welcome to 3D Print Quote!',
-          text,
-          html,
-        });
-        break;
+        throw new Error('SendGrid is not configured');
       }
       case 'smtp': {
-        const nodemailer = require('nodemailer');
+        const nodemailerModule = await import('nodemailer');
+        const nodemailer = nodemailerModule.default || nodemailerModule;
         const transporter = nodemailer.createTransporter({
           host: process.env.EMAIL_HOST,
           port: parseInt(process.env.EMAIL_PORT || '587'),

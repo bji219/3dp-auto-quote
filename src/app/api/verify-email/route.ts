@@ -53,6 +53,26 @@ export async function POST(request: NextRequest) {
     }
 
     const verification = await createVerificationCode(email, { ipAddress, userAgent });
+
+    // Skip email sending in development if configured
+    const skipEmail = process.env.SKIP_EMAIL_VERIFICATION === 'true';
+
+    if (skipEmail) {
+      console.log(`[DEV] Verification code for ${email}: ${verification.code}`);
+      await recordVerificationAttempt(email, true, ipAddress);
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Verification code sent successfully',
+          code: verification.code, // Only in dev mode
+          expiresAt: verification.expiresAt.toISOString(),
+          attemptsRemaining: rateLimit.attemptsRemaining - 1,
+        },
+        { status: 200 }
+      );
+    }
+
     const emailResult = await sendVerificationCodeEmail(email, verification.code, 15);
 
     await recordVerificationAttempt(email, emailResult.success, ipAddress);
