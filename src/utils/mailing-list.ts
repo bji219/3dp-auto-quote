@@ -199,7 +199,12 @@ export async function addSubscriberTags(
       };
     }
 
-    const existingTags = (subscriber.tags as string[]) || [];
+    // Normalize tags: handle string | null by converting to array
+    const existingTags: string[] = subscriber.tags
+      ? (typeof subscriber.tags === 'string'
+          ? subscriber.tags.split(',').map(t => t.trim()).filter(Boolean)
+          : [])
+      : [];
     const combinedTags = Array.from(new Set([...existingTags, ...newTags]));
 
     await prisma.mailingListSubscriber.update({
