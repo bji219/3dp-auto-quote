@@ -214,7 +214,7 @@ export default function FileUploadZone({ onUploadComplete, onError }: FileUpload
                 <div className="col-span-2 md:col-span-1">
                   <span className="text-green-700 font-medium">Print Time:</span>
                   <span className="text-green-600 ml-1">
-                    ~{uploadedFile.stlData.estimatedPrintTime.toFixed(1)} hrs
+                    ~{uploadedFile.stlData.estimatedPrintTime?.toFixed(1) ?? 'N/A'} hrs
                   </span>
                 </div>
               </div>
