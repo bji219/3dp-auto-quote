@@ -138,7 +138,7 @@ export async function deleteMarkedFiles(): Promise<number> {
     },
   });
 
-  const storage = getStorage();
+  const storage = await getStorage();
   let deletedCount = 0;
 
   for (const file of markedFiles) {
@@ -169,7 +169,7 @@ export async function deleteMarkedFiles(): Promise<number> {
  * Files that exist in storage but have no database record
  */
 export async function cleanupOrphanedFiles(): Promise<number> {
-  const storage = getStorage();
+  const storage = await getStorage();
 
   // Only works with local storage
   if (!(storage instanceof (await import('./file-storage')).LocalStorage)) {
