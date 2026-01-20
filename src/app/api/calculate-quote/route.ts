@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           : fileRecord.boundingBox as { x: number; y: number; z: number },
         estimatedPrintTime: 0,
         // Dummy values for unused properties in pricing calculation
-        vertices: [],
+        vertices: 0,
         triangles: 0,
         isValid: true,
       };
