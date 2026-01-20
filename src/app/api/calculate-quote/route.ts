@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import type { STLData } from '@/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
