@@ -3,23 +3,81 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 249, 250, 251;
-  --background-end-rgb: 255, 255, 255;
+  /* IDW3D Dark Theme Colors */
+  --primary-dark: #0a0e12;
+  --secondary-dark: #1a1f26;
+  --accent-cyan: #00d9ff;
+  --accent-amber: #ffb800;
+  --text-primary: #e8edf2;
+  --text-secondary: #8a95a3;
+  --border-color: #2a3340;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: var(--primary-dark);
+  color: var(--text-primary);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Override Tailwind defaults for dark theme */
+.bg-white {
+  background-color: var(--secondary-dark) !important;
+}
+
+.bg-gray-50 {
+  background-color: var(--primary-dark) !important;
+}
+
+.bg-gray-100 {
+  background-color: var(--secondary-dark) !important;
+}
+
+.text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+.text-gray-700,
+.text-gray-600 {
+  color: var(--text-secondary) !important;
+}
+
+.border-gray-300,
+.border-gray-200 {
+  border-color: var(--border-color) !important;
+}
+
+/* Button Primary - Cyan accent */
+.bg-primary-600,
+.bg-indigo-600,
+.bg-blue-600 {
+  background-color: var(--accent-cyan) !important;
+  color: var(--primary-dark) !important;
+}
+
+.bg-primary-700,
+.bg-indigo-700,
+.bg-blue-700 {
+  background-color: #00b8d9 !important;
+}
+
+/* Input fields */
+input,
+textarea,
+select {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent-cyan) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1) !important;
 }

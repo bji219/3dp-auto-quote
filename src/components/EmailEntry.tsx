@@ -58,7 +58,7 @@ export default function EmailEntry({ onEmailSubmit, disabled = false }: EmailEnt
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
         <p className="mt-2 text-sm text-gray-500">
-          We'll send your quote to this email address
+          We&apos;ll send your quote to this email address
         </p>
       </div>
 
