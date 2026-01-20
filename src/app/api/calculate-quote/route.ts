@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         data: {
           volume: stlData.volume,
           surfaceArea: stlData.surfaceArea,
-          boundingBox: stlData.boundingBox,
+          boundingBox: JSON.stringify(stlData.boundingBox),
         },
       });
     }
