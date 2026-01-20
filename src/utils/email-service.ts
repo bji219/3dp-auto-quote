@@ -324,7 +324,7 @@ If you have any questions, feel free to reach out to us.
   try {
     switch (service) {
       case 'resend': {
-        const resend = getResendClient();
+        const resend = await getResendClient();
         const { error } = await resend.emails.send({
           from: `${EMAIL_CONFIG.FROM_NAME} <${EMAIL_CONFIG.FROM_EMAIL}>`,
           to: email,
