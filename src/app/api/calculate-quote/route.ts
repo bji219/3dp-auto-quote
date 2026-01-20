@@ -74,17 +74,21 @@ export async function POST(request: NextRequest) {
     });
 
     // Use cached STL data if available, otherwise parse file
-    let stlData;
+    let stlData: STLData;
 
     if (fileRecord.volume && fileRecord.surfaceArea && fileRecord.boundingBox) {
-      // Use cached metrics
+      // Use cached metrics (add dummy values for unused properties)
       stlData = {
         volume: fileRecord.volume,
         surfaceArea: fileRecord.surfaceArea,
         boundingBox: typeof fileRecord.boundingBox === 'string'
           ? JSON.parse(fileRecord.boundingBox)
           : fileRecord.boundingBox as { x: number; y: number; z: number },
-        estimatedPrintTime: 0, // Will be recalculated by pricing engine
+        estimatedPrintTime: 0,
+        // Dummy values for unused properties in pricing calculation
+        vertices: [],
+        triangles: 0,
+        isValid: true,
       };
     } else {
       // Read and parse STL file
