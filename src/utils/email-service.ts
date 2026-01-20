@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer';
+
 /**
  * Email service configuration
  */
@@ -103,10 +105,7 @@ async function sendVerificationEmailViaSMTP(
   expiresInMinutes: number = 15
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const nodemailerModule = await import('nodemailer');
-    const nodemailer = nodemailerModule.default || nodemailerModule;
-
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
       port: parseInt(process.env.EMAIL_PORT || '587'),
       secure: false,
@@ -340,9 +339,7 @@ If you have any questions, feel free to reach out to us.
         throw new Error('SendGrid is not configured');
       }
       case 'smtp': {
-        const nodemailerModule = await import('nodemailer');
-        const nodemailer = nodemailerModule.default || nodemailerModule;
-        const transporter = nodemailer.createTransporter({
+        const transporter = nodemailer.createTransport({
           host: process.env.EMAIL_HOST,
           port: parseInt(process.env.EMAIL_PORT || '587'),
           secure: false,
