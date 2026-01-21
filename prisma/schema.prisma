@@ -11,6 +11,8 @@ datasource db {
   // Netlify integration provides SUPABASE_DATABASE_URL
   // Manual setup uses DATABASE_URL
   url      = env("SUPABASE_DATABASE_URL")
+  // Direct connection for migrations (bypasses connection pooler)
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model Quote {

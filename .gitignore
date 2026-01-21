@@ -44,3 +44,6 @@ prisma/migrations
 
 # uploads
 /public/uploads
+
+# Local Netlify folder
+.netlify
