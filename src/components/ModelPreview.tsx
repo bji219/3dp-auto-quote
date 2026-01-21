@@ -8,9 +8,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 interface ModelPreviewProps {
   fileId: string;
   fileName: string;
+  fileDataUrl?: string; // Base64 data URL for direct loading (serverless)
 }
 
-export default function ModelPreview({ fileId, fileName }: ModelPreviewProps) {
+export default function ModelPreview({ fileId, fileName, fileDataUrl }: ModelPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -59,8 +60,8 @@ export default function ModelPreview({ fileId, fileName }: ModelPreviewProps) {
     scene.add(directionalLight2);
 
     const loader = new STLLoader();
-    // Use API endpoint to serve file (handles /tmp on serverless)
-    const stlPath = '/api/files/' + fileId;
+    // Prefer base64 data URL (works on serverless), fallback to API endpoint
+    const stlPath = fileDataUrl || '/api/files/' + fileId;
 
     loader.load(
       stlPath,

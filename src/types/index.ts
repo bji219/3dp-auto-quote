@@ -69,6 +69,7 @@ export interface UploadResponse {
     fileSize: number;
     fileHash: string;
     stlData: STLData;
+    fileDataUrl?: string; // Base64 data URL for client-side preview
   };
   error?: string;
 }

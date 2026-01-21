@@ -10,6 +10,7 @@ interface FileUploadZoneProps {
     fileName: string;
     fileSize: number;
     stlData: STLData;
+    fileDataUrl?: string;
   }) => void;
   onError?: (error: string) => void;
 }

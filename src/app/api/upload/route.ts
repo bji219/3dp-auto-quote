@@ -164,6 +164,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Convert file to base64 data URL for client-side preview
+    // This avoids serverless storage issues where files don't persist between requests
+    const base64Data = buffer.toString('base64');
+    const fileDataUrl = `data:application/sla;base64,${base64Data}`;
+
     return NextResponse.json<UploadResponse>(
       {
         success: true,
@@ -176,6 +181,7 @@ export async function POST(request: NextRequest) {
           fileSize: file.size,
           fileHash,
           stlData,
+          fileDataUrl, // Include base64 data for client-side preview
         },
       },
       { status: 200 }

@@ -6,7 +6,16 @@
       "Bash(git push:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nFix Resend client Promise handling in sendWelcomeEmail\n\nAwait getResendClient\\(\\) before accessing emails.send method.\ngetResendClient\\(\\) is async and returns Promise<any>.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
-      "Bash(npx prisma generate:*)"
+      "Bash(npx prisma generate:*)",
+      "Bash(curl -s https://quote.idw3d.com/api/debug-env)",
+      "Bash(timeout 15 netlify logs:function:*)",
+      "Bash(vercel link:*)",
+      "Bash(vercel logs:*)",
+      "Bash(curl:*)",
+      "Bash(vercel curl \"https://3dp-auto-quote-jxvda5lo1-bji219s-projects.vercel.app/api/debug-env\")",
+      "Bash(vercel curl /api/debug-env --deployment 3dp-auto-quote-jxvda5lo1-bji219s-projects.vercel.app)",
+      "Bash(vercel curl:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

@@ -17,6 +17,7 @@ export default function QuotePage() {
     fileName: string;
     fileSize: number;
     stlData: STLData;
+    fileDataUrl?: string;
   } | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export default function QuotePage() {
     fileName: string;
     fileSize: number;
     stlData: STLData;
+    fileDataUrl?: string;
   }) => {
     setUploadedFile(data);
     setCurrentStep('preview');
@@ -159,6 +161,7 @@ export default function QuotePage() {
                 <ModelPreview
                   fileId={uploadedFile.fileId}
                   fileName={uploadedFile.fileName}
+                  fileDataUrl={uploadedFile.fileDataUrl}
                 />
                 <div className="flex justify-center">
                   <button
