@@ -4,6 +4,20 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// Get database URL from either Netlify Supabase integration or manual config
+const getDatabaseUrl = () => {
+  // Netlify Supabase integration uses SUPABASE_DATABASE_URL
+  if (process.env.SUPABASE_DATABASE_URL) {
+    return process.env.SUPABASE_DATABASE_URL;
+  }
+  // Manual configuration uses DATABASE_URL
+  if (process.env.DATABASE_URL) {
+    return process.env.DATABASE_URL;
+  }
+  // Fallback for build-time when DB not needed
+  return 'postgresql://placeholder';
+};
+
 // Prisma client configuration for serverless environments (Netlify, Vercel)
 // Uses connection pooling and optimized settings for Supabase
 export const prisma =
@@ -12,7 +26,7 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: getDatabaseUrl(),
       },
     },
   });

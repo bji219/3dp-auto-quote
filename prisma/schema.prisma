@@ -7,9 +7,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // Enable connection pooling for serverless environments
-  directUrl = env("DIRECT_DATABASE_URL")
+  // Support both Netlify Supabase integration and manual configuration
+  // Netlify integration provides SUPABASE_DATABASE_URL
+  // Manual setup uses DATABASE_URL
+  url      = env("SUPABASE_DATABASE_URL")
 }
 
 model Quote {
