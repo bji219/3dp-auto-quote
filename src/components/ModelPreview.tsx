@@ -59,7 +59,8 @@ export default function ModelPreview({ fileId, fileName }: ModelPreviewProps) {
     scene.add(directionalLight2);
 
     const loader = new STLLoader();
-    const stlPath = '/uploads/' + fileId + '.stl';
+    // Use API endpoint to serve file (handles /tmp on serverless)
+    const stlPath = '/api/files/' + fileId;
 
     loader.load(
       stlPath,
