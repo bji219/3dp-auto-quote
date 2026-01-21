@@ -6,9 +6,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  // For PostgreSQL, use: provider = "postgresql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Enable connection pooling for serverless environments
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model Quote {
