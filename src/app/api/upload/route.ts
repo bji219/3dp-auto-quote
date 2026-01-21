@@ -86,11 +86,21 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     // Parse STL file first (to validate before saving)
+    console.log(`Parsing STL file: ${file.name}, size: ${file.size} bytes`);
     const stlData = await parseSTL(arrayBuffer);
+
+    console.log('STL parsed:', {
+      volume: stlData.volume,
+      surfaceArea: stlData.surfaceArea,
+      vertices: stlData.vertices,
+      triangles: stlData.triangles,
+      isValid: stlData.isValid,
+    });
 
     // Validate parsed data
     const validation = validateSTLData(stlData);
     if (!validation.valid) {
+      console.error('STL validation failed:', validation.errors);
       return NextResponse.json<UploadResponse>(
         {
           success: false,
@@ -171,7 +181,18 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Upload error details:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      env: {
+        DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Not set',
+        STORAGE_TYPE: process.env.STORAGE_TYPE || 'local (default)',
+        STORAGE_BASE_PATH: process.env.STORAGE_BASE_PATH || 'default',
+        NETLIFY: process.env.NETLIFY || 'false',
+      }
+    });
+
     return NextResponse.json<UploadResponse>(
       {
         success: false,

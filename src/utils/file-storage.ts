@@ -28,9 +28,15 @@ export interface FileMetadata {
 }
 
 // Storage configuration from environment
+// Use /tmp for serverless environments (Netlify, Vercel), public/uploads for local dev
+const isServerless = process.env.NETLIFY || process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const defaultBasePath = isServerless
+  ? '/tmp/uploads'
+  : path.join(process.cwd(), 'public', 'uploads');
+
 export const STORAGE_CONFIG: StorageConfig = {
   type: (process.env.STORAGE_TYPE as 'local' | 's3' | 'gcs') || 'local',
-  basePath: process.env.STORAGE_BASE_PATH || path.join(process.cwd(), 'public', 'uploads'),
+  basePath: process.env.STORAGE_BASE_PATH || defaultBasePath,
   bucket: process.env.STORAGE_BUCKET,
   region: process.env.STORAGE_REGION || 'us-east-1',
   accessKeyId: process.env.STORAGE_ACCESS_KEY_ID,
