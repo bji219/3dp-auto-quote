@@ -4,10 +4,12 @@
 
 Your site now uses the **Netlify Supabase Integration**, which automatically manages your database connection and provides these environment variables:
 
-- `SUPABASE_DATABASE_URL` - Connection string for your database
+- `SUPABASE_URL` - Supabase API URL (for JavaScript client)
 - `SUPABASE_ANON_KEY` - Public anonymous key (for client-side)
 - `SUPABASE_SERVICE_ROLE_KEY` - Admin key (for server-side)
 - `SUPABASE_JWT_SECRET` - JWT signing secret
+
+**IMPORTANT:** The Netlify plugin provides the Supabase API URL, NOT the PostgreSQL connection string. You must manually add the database connection strings for Prisma.
 
 ## Current Configuration
 
@@ -21,14 +23,19 @@ Your site now uses the **Netlify Supabase Integration**, which automatically man
 ### 🔧 Required Environment Variables
 
 The Netlify integration provides these **automatically**:
-- ✅ `SUPABASE_DATABASE_URL`
+- ✅ `SUPABASE_URL` (API URL)
 - ✅ `SUPABASE_ANON_KEY`
 - ✅ `SUPABASE_SERVICE_ROLE_KEY`
 - ✅ `SUPABASE_JWT_SECRET`
 
-You still need to **manually add** these in Netlify:
+You **MUST manually add** these in Netlify (the plugin doesn't provide them):
 
 ```bash
+# PostgreSQL Connection Strings (REQUIRED for Prisma)
+# Get these from Supabase Dashboard → Settings → Database
+SUPABASE_DATABASE_URL=postgresql://postgres.cmpuempocorplayelrvc:46z4EkSB3Pq7rYwN@aws-0-us-west-2.pooler.supabase.com:6543/postgres
+DIRECT_DATABASE_URL=postgresql://postgres:46z4EkSB3Pq7rYwN@db.cmpuempocorplayelrvc.supabase.co:5432/postgres
+
 # App Configuration
 NEXT_PUBLIC_APP_URL=https://quote.idw3d.com
 
@@ -157,23 +164,39 @@ SUPABASE_DATABASE_URL="postgresql://postgres.abc:password@aws-0-us-east-1.pooler
 ### Production: 500 Error on Upload
 
 **Possible Causes:**
-1. Database tables not created
-2. Missing environment variables
-3. File storage path issues
+1. **Netlify plugin provides API URL, not PostgreSQL connection string**
+2. Database tables not created
+3. Missing environment variables
+4. File storage path issues
 
 **Solutions:**
 
-**1. Create Tables:**
+**1. Fix Database Connection (MOST COMMON):**
+
+The Netlify Supabase plugin provides `SUPABASE_URL` (API URL like `https://xxx.supabase.co`), but Prisma needs the **PostgreSQL connection string**.
+
+You must **manually add/overwrite** these in Netlify:
+
 ```bash
-# Locally, push schema to Supabase
-SUPABASE_DATABASE_URL="your-connection-string" npx prisma db push
+# Go to: Netlify Dashboard → Site Settings → Environment Variables
+# Add or UPDATE these:
+SUPABASE_DATABASE_URL=postgresql://postgres.xxx:PASSWORD@aws-0-us-west-2.pooler.supabase.com:6543/postgres
+DIRECT_DATABASE_URL=postgresql://postgres:PASSWORD@db.xxx.supabase.co:5432/postgres
 ```
 
-**2. Check Netlify Environment:**
-- Site Settings → Environment Variables
-- Verify all required variables are set
+Get these from: **Supabase Dashboard → Settings → Database → Connection String**
 
-**3. File Storage:**
+**2. Create Tables:**
+```bash
+# Locally, push schema to Supabase
+npx prisma db push
+```
+
+**3. Check Netlify Environment:**
+- Site Settings → Environment Variables
+- Verify SUPABASE_DATABASE_URL starts with `postgresql://` (not `https://`)
+
+**4. File Storage:**
 - Files stored in `/tmp` on Netlify (ephemeral)
 - For persistence, configure S3 (see TROUBLESHOOTING.md)
 
