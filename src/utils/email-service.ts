@@ -688,6 +688,35 @@ export async function sendAdminOrderNotification(orderData: {
   const service = getEmailService();
   const adminEmail = process.env.ADMIN_EMAIL || 'intelligentdesignworkslimited@gmail.com';
 
+  // Get STL file for attachment
+  let stlFileBuffer: Buffer | null = null;
+  let stlFileName = orderData.fileName;
+
+  if (orderData.fileId) {
+    try {
+      const { prisma } = await import('@/lib/prisma');
+      const { getStorage, getStoragePath } = await import('./file-storage');
+
+      // Fetch file record from database
+      const fileRecord = await prisma.fileUpload.findFirst({
+        where: { fileId: orderData.fileId },
+      });
+
+      if (fileRecord && fileRecord.filePath) {
+        // Read file from storage
+        const storage = await getStorage();
+        stlFileBuffer = await storage.readFile(fileRecord.filePath);
+        stlFileName = fileRecord.fileName;
+        console.log(`STL file loaded for attachment: ${stlFileName}, size: ${stlFileBuffer.length} bytes`);
+      } else {
+        console.warn(`File record not found or no filePath for fileId: ${orderData.fileId}`);
+      }
+    } catch (error) {
+      console.error('Failed to load STL file for attachment:', error);
+      // Continue without attachment rather than failing the entire email
+    }
+  }
+
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -745,7 +774,7 @@ export async function sendAdminOrderNotification(orderData: {
 
     <div style="background: #fef3c7; border-radius: 8px; padding: 15px; margin-top: 20px;">
       <p style="margin: 0; color: #92400e;">
-        <strong>Action Required:</strong> Download the STL file from your Supabase database (FileUpload table) using the File ID above, then begin printing.
+        <strong>Action Required:</strong> ${stlFileBuffer ? 'The STL file is attached to this email.' : 'Download the STL file from your database (FileUpload table) using the File ID above.'} Review the order details and begin printing.
       </p>
     </div>
   </div>
@@ -772,20 +801,34 @@ Volume: ${orderData.volume.toFixed(2)} cm³
 Dimensions: ${orderData.boundingBox}
 ${orderData.rushOrder ? 'RUSH ORDER: YES' : ''}
 
-ACTION REQUIRED: Download the STL file from your Supabase database (FileUpload table) using the File ID above, then begin printing.
+ACTION REQUIRED: ${stlFileBuffer ? 'The STL file is attached to this email.' : 'Download the STL file from your database (FileUpload table) using the File ID above.'} Review the order details and begin printing.
   `.trim();
 
   try {
     switch (service) {
       case 'resend': {
         const resend = await getResendClient();
-        const { error } = await resend.emails.send({
+
+        // Prepare email data
+        const emailData: any = {
           from: `${EMAIL_CONFIG.FROM_NAME} <${EMAIL_CONFIG.FROM_EMAIL}>`,
           to: adminEmail,
           subject: `New Order: $${orderData.totalCost.toFixed(2)} - ${orderData.fileName}`,
           html,
           text,
-        });
+        };
+
+        // Add STL file attachment if available
+        if (stlFileBuffer) {
+          emailData.attachments = [
+            {
+              filename: stlFileName,
+              content: stlFileBuffer,
+            },
+          ];
+        }
+
+        const { error } = await resend.emails.send(emailData);
         if (error) throw error;
         break;
       }
@@ -799,13 +842,27 @@ ACTION REQUIRED: Download the STL file from your Supabase database (FileUpload t
             pass: process.env.EMAIL_PASSWORD,
           },
         });
-        await transporter.sendMail({
+
+        // Prepare email data
+        const mailOptions: any = {
           from: `"${EMAIL_CONFIG.FROM_NAME}" <${EMAIL_CONFIG.FROM_EMAIL}>`,
           to: adminEmail,
           subject: `New Order: $${orderData.totalCost.toFixed(2)} - ${orderData.fileName}`,
           text,
           html,
-        });
+        };
+
+        // Add STL file attachment if available
+        if (stlFileBuffer) {
+          mailOptions.attachments = [
+            {
+              filename: stlFileName,
+              content: stlFileBuffer,
+            },
+          ];
+        }
+
+        await transporter.sendMail(mailOptions);
         break;
       }
       default:

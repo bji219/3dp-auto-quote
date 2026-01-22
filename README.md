@@ -8,9 +8,13 @@ A full-stack web application built with Next.js and TypeScript that provides ins
 - **Automatic Volume Calculation**: Calculate model volume, surface area, and bounding box
 - **Instant Quote Generation**: Real-time pricing based on material, quality, infill, and other parameters
 - **Email Verification**: Secure quote delivery via email verification
+- **Stripe Payment Integration**: Secure payment processing with Stripe Checkout
+- **Order Management**: Complete order flow with email notifications and admin alerts
+- **STL File Delivery**: Automatic attachment of STL files to admin order notifications
 - **Configurable Print Options**: Choose material, quality, infill percentage, color, and rush order
 - **Database Integration**: SQLite (development) or PostgreSQL (production) support
 - **Responsive UI**: Modern, mobile-friendly interface with Tailwind CSS
+- **Terms of Service**: Comprehensive legal terms page (requires attorney review)
 
 ## Tech Stack
 
@@ -18,7 +22,8 @@ A full-stack web application built with Next.js and TypeScript that provides ins
 - **Backend**: Next.js API Routes
 - **Database**: Prisma ORM with SQLite/PostgreSQL
 - **Styling**: Tailwind CSS
-- **Email**: Nodemailer
+- **Email**: Nodemailer, Resend
+- **Payments**: Stripe Checkout, Stripe Webhooks
 - **File Upload**: React Dropzone
 - **3D Processing**: Custom STL parser with Three.js types
 
@@ -157,6 +162,84 @@ SQLite is configured by default. No additional setup required.
    - Security → 2-Step Verification → App passwords
    - Generate a password for "Mail"
 3. Use the app password in `EMAIL_PASSWORD` in `.env`
+
+## Stripe Payment Integration
+
+The application uses Stripe Checkout for secure payment processing.
+
+### Stripe Setup
+
+1. Create a Stripe account at [stripe.com](https://stripe.com)
+2. Get your API keys from the Stripe Dashboard:
+   - Developers → API keys
+   - Copy your **Publishable key** and **Secret key**
+3. Add Stripe keys to `.env`:
+   ```env
+   STRIPE_SECRET_KEY="sk_test_..."
+   STRIPE_WEBHOOK_SECRET="whsec_..."
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
+   ```
+
+### Webhook Configuration
+
+Stripe webhooks are required to process successful payments:
+
+#### For Local Development (using Stripe CLI)
+
+1. Install Stripe CLI:
+   ```bash
+   # macOS
+   brew install stripe/stripe-cli/stripe
+
+   # Windows
+   scoop install stripe
+
+   # Linux
+   # See: https://stripe.com/docs/stripe-cli
+   ```
+
+2. Login to Stripe CLI:
+   ```bash
+   stripe login
+   ```
+
+3. Forward webhooks to your local server:
+   ```bash
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
+   ```
+
+4. Copy the webhook signing secret (starts with `whsec_...`) to your `.env` file
+
+#### For Production Deployment
+
+1. Go to Stripe Dashboard → Developers → Webhooks
+2. Click "Add endpoint"
+3. Enter your webhook URL: `https://yourdomain.com/api/webhooks/stripe`
+4. Select events to listen for:
+   - `checkout.session.completed`
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+5. Copy the webhook signing secret to your production environment variables
+
+### Testing Payments
+
+Use Stripe's test card numbers:
+- **Success**: `4242 4242 4242 4242`
+- **Requires authentication**: `4000 0025 0000 3155`
+- **Declined**: `4000 0000 0000 9995`
+
+Use any future expiry date, any 3-digit CVC, and any ZIP code.
+
+### Payment Flow
+
+1. Customer uploads STL file and receives quote
+2. Customer verifies email address
+3. Customer clicks "Order Now" → redirected to `/order/[quoteId]`
+4. Customer clicks "Proceed to Payment" → redirected to Stripe Checkout
+5. After successful payment → redirected to `/order/[quoteId]/success`
+6. Stripe webhook confirms payment → order status updated to "accepted"
+7. Admin receives email with STL file attached
+8. Customer receives order confirmation email
 
 ## Available Scripts
 
