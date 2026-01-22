@@ -44,13 +44,13 @@ interface QuoteData {
 }
 
 const MATERIALS = [
-  { value: 'PLA', label: 'PLA', description: 'Best for prototypes and general use' },
-  { value: 'ABS', label: 'ABS', description: 'Strong and heat-resistant' },
-  { value: 'PETG', label: 'PETG', description: 'Durable and chemical resistant' },
-  { value: 'TPU', label: 'TPU (Flexible)', description: 'Flexible and elastic' },
-  { value: 'Nylon', label: 'Nylon', description: 'Very strong and durable' },
-  { value: 'Carbon Fiber', label: 'Carbon Fiber', description: 'Extremely strong and lightweight' },
-  { value: 'Resin', label: 'Resin', description: 'Highest detail and smooth finish' },
+  { value: 'PLA', label: 'PLA', description: 'Best for prototypes and general use', available: true },
+  { value: 'ABS', label: 'ABS (Coming Soon)', description: 'Strong and heat-resistant - Email us for special requests', available: false },
+  { value: 'PETG', label: 'PETG (Coming Soon)', description: 'Durable and chemical resistant - Email us for special requests', available: false },
+  { value: 'TPU', label: 'TPU Flexible (Coming Soon)', description: 'Flexible and elastic - Email us for special requests', available: false },
+  { value: 'Nylon', label: 'Nylon (Coming Soon)', description: 'Very strong and durable - Email us for special requests', available: false },
+  { value: 'Carbon Fiber', label: 'Carbon Fiber (Coming Soon)', description: 'Extremely strong and lightweight - Email us for special requests', available: false },
+  { value: 'Resin', label: 'Resin (Coming Soon)', description: 'Highest detail and smooth finish - Email us for special requests', available: false },
 ];
 
 const QUALITY_OPTIONS = [
@@ -134,7 +134,7 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               {MATERIALS.map((mat) => (
-                <option key={mat.value} value={mat.value}>
+                <option key={mat.value} value={mat.value} disabled={!mat.available}>
                   {mat.label}
                 </option>
               ))}
@@ -255,22 +255,21 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
             </div>
 
             <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Setup Fee</span>
-                <span className="text-gray-800">{formatCurrency(quote.breakdown.setupFee)}</span>
+              {/* Consolidated Estimated Price line item */}
+              <div className="flex justify-between text-sm font-medium">
+                <span className="text-gray-700">Estimated Price</span>
+                <span className="text-gray-800">
+                  {formatCurrency(
+                    quote.breakdown.setupFee +
+                    quote.breakdown.materialCost +
+                    quote.breakdown.laborCost +
+                    quote.breakdown.machineCost
+                  )}
+                </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Material Cost</span>
-                <span className="text-gray-800">{formatCurrency(quote.breakdown.materialCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Labor Cost</span>
-                <span className="text-gray-800">{formatCurrency(quote.breakdown.laborCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Machine Time</span>
-                <span className="text-gray-800">{formatCurrency(quote.breakdown.machineCost)}</span>
-              </div>
+              <p className="text-xs text-gray-500 ml-2">
+                Includes setup, material, labor, and machine time
+              </p>
               {quote.breakdown.complexitySurcharge > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Complexity Surcharge</span>

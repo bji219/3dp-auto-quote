@@ -4,6 +4,7 @@ import { requireAuth } from '@/middleware/auth';
 import { parseSTL } from '@/utils/stl-parser-enhanced';
 import { calculateDetailedQuote } from '@/utils/pricing-enhanced';
 import { prisma } from '@/lib/prisma';
+import { sendQuoteEmail } from '@/utils/email-service';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
         filePath: fileRecord.filePath,
         fileSize: fileRecord.fileSize,
         fileHash: fileRecord.fileHash,
-        
+
         // STL metrics
         volume: stlData.volume,
         surfaceArea: stlData.surfaceArea,
@@ -153,14 +154,14 @@ export async function POST(request: NextRequest) {
           y: stlData.boundingBox.y,
           z: stlData.boundingBox.z,
         }),
-        
+
         // Pricing options
         material,
         infillPercentage,
         quality,
         color: color || null,
         rushOrder,
-        
+
         // Cost breakdown
         baseCost: quote.breakdown.setupFee,
         materialCost: quote.breakdown.materialCost,
@@ -176,6 +177,28 @@ export async function POST(request: NextRequest) {
         userAgent,
       },
     });
+
+    // Send quote email to customer with Order Now link
+    try {
+      await sendQuoteEmail(email, {
+        quoteId: savedQuote.id,
+        fileName: savedQuote.fileName,
+        material: savedQuote.material,
+        quality: savedQuote.quality,
+        totalCost: savedQuote.totalCost,
+        validUntil: savedQuote.validUntil,
+        breakdown: {
+          estimatedPrice: quote.breakdown.setupFee + quote.breakdown.materialCost + quote.breakdown.laborCost + quote.breakdown.machineCost,
+          shippingCost: quote.breakdown.shippingCost,
+          rushOrderFee: quote.breakdown.rushOrderFee,
+          discount: quote.breakdown.discount,
+          taxAmount: quote.breakdown.taxAmount,
+        },
+      });
+    } catch (emailError) {
+      console.error('Failed to send quote email:', emailError);
+      // Don't fail the request if email fails - quote is still valid
+    }
 
     return NextResponse.json(
       {

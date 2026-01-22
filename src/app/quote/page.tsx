@@ -216,6 +216,9 @@ export default function QuotePage() {
                     <p className="text-green-700 mb-4">
                       Your quote has been sent to {userEmail}
                     </p>
+                    <p className="text-sm text-green-600 mb-4">
+                      Quote valid for 7 days
+                    </p>
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                       <button
                         onClick={() => {
@@ -230,12 +233,10 @@ export default function QuotePage() {
                         Get Another Quote
                       </button>
                       <a
-                        href={'/api/quote/' + generatedQuoteId}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
+                        href={'/api/order/' + generatedQuoteId}
+                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors text-lg"
                       >
-                        View Quote Details
+                        Order Now
                       </a>
                     </div>
                   </div>
