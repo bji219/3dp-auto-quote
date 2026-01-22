@@ -5,14 +5,21 @@ import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 /**
  * POST /api/checkout
  * Create Stripe Checkout session for a quote
  */
 export async function POST(request: NextRequest) {
   try {
+    // Initialize Stripe inside the handler to avoid build-time errors
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { success: false, message: 'Stripe is not configured' },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     const body = await request.json();
     const { quoteId } = body;
 

@@ -6,15 +6,23 @@ import { sendOrderConfirmationEmail, sendAdminOrderNotification } from '@/utils/
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
 /**
  * POST /api/webhooks/stripe
  * Handle Stripe webhook events
  */
 export async function POST(request: NextRequest) {
+  // Initialize Stripe inside the handler to avoid build-time errors
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error('Stripe configuration missing');
+    return NextResponse.json(
+      { error: 'Stripe is not configured' },
+      { status: 500 }
+    );
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
   const body = await request.text();
   const signature = request.headers.get('stripe-signature');
 
