@@ -705,9 +705,12 @@ export async function sendAdminOrderNotification(orderData: {
       if (fileRecord && fileRecord.filePath) {
         // Read file from storage
         const storage = await getStorage();
-        stlFileBuffer = await storage.readFile(fileRecord.filePath);
-        stlFileName = fileRecord.fileName;
-        console.log(`STL file loaded for attachment: ${stlFileName}, size: ${stlFileBuffer.length} bytes`);
+        const buffer = await storage.readFile(fileRecord.filePath);
+        if (buffer) {
+          stlFileBuffer = buffer;
+          stlFileName = fileRecord.fileName;
+          console.log(`STL file loaded for attachment: ${stlFileName}, size: ${buffer.length} bytes`);
+        }
       } else {
         console.warn(`File record not found or no filePath for fileId: ${orderData.fileId}`);
       }
