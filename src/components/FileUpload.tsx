@@ -63,6 +63,10 @@ export default function FileUpload({ onUploadSuccess, onUploadError }: FileUploa
     accept: {
       'application/sla': ['.stl'],
       'application/vnd.ms-pki.stl': ['.stl'],
+      'model/stl': ['.stl'],
+      'model/x.stl-ascii': ['.stl'],
+      'model/x.stl-binary': ['.stl'],
+      'application/octet-stream': ['.stl'],
     },
     maxFiles: 1,
     maxSize: 50 * 1024 * 1024, // 50MB

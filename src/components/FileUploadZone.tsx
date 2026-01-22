@@ -100,6 +100,8 @@ export default function FileUploadZone({ onUploadComplete, onError }: FileUpload
       'model/stl': ['.stl'],
       'model/x.stl-ascii': ['.stl'],
       'model/x.stl-binary': ['.stl'],
+      'application/octet-stream': ['.stl'],
+      'application/vnd.ms-pki.stl': ['.stl'],
     },
     maxFiles: 1,
     disabled: isUploading,
