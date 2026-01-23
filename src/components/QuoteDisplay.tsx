@@ -6,7 +6,7 @@ import { STLData } from '@/types';
 interface QuoteDisplayProps {
   stlData: STLData;
   fileId: string;
-  sessionToken: string;
+  sessionToken?: string; // Now optional
   onQuoteGenerated?: (quoteId: string) => void;
 }
 
@@ -68,23 +68,42 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [error, setError] = useState('');
 
+  // Anti-bot honeypot
+  const [honeypot, setHoneypot] = useState('');
+  const [formLoadTime] = useState(Date.now());
+
+  // Email capture
+  const [email, setEmail] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   const handleCalculateQuote = async () => {
     setError('');
     setIsCalculating(true);
 
     try {
-      const response = await fetch('/api/calculate-quote', {
+      // Use public API (no auth required) or authenticated API
+      const endpoint = sessionToken ? '/api/calculate-quote' : '/api/calculate-quote-public';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (sessionToken) {
+        headers['Authorization'] = 'Bearer ' + sessionToken;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + sessionToken,
-        },
+        headers,
         body: JSON.stringify({
           fileId,
           material,
           infillPercentage,
           quality,
           rushOrder,
+          // Anti-bot fields (only for public API)
+          ...(sessionToken ? {} : { honeypot, formLoadTime }),
         }),
       });
 
@@ -101,6 +120,34 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
       setError(message);
     } finally {
       setIsCalculating(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!quote || !email) return;
+
+    setEmailError('');
+    setIsSendingEmail(true);
+
+    try {
+      const response = await fetch(`/api/quote/${quote.id}/save-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to send email');
+      }
+
+      setEmailSent(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send email';
+      setEmailError(message);
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -122,6 +169,17 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
         <h2 className="text-2xl font-bold text-gray-800 mb-6">
           Configure Your Quote
         </h2>
+
+        {/* Hidden honeypot field for bot detection */}
+        <input
+          type="text"
+          name="website"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+          style={{ position: 'absolute', left: '-9999px' }}
+          tabIndex={-1}
+          autoComplete="off"
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
@@ -218,7 +276,7 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
               Calculating Quote...
             </span>
           ) : (
-            'Calculate Quote'
+            'Get Instant Quote'
           )}
         </button>
 
@@ -311,11 +369,51 @@ export default function QuoteDisplay({ stlData, fileId, sessionToken, onQuoteGen
               </span>
             </div>
 
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
+            {/* Email capture section */}
+            {!emailSent ? (
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  Get Quote Details by Email
+                </h4>
+                <p className="text-sm text-blue-700 mb-3">
+                  Enter your email to receive the full quote details and an Order Now link.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1 px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={!email || isSendingEmail}
+                    className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSendingEmail ? 'Sending...' : 'Send'}
+                  </button>
+                </div>
+                {emailError && (
+                  <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                )}
+              </div>
+            ) : (
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-green-800 font-medium">Quote details sent to {email}!</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-sm text-gray-600">
                 <span className="font-semibold">Quote ID:</span> {quote.id}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Save this ID to retrieve your quote later
               </p>
             </div>
