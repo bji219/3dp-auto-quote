@@ -71,7 +71,7 @@ export async function POST(
     }) : null;
 
     // Send confirmation email to customer
-    await sendOrderConfirmationEmail(quote.email, {
+    const customerEmailResult = await sendOrderConfirmationEmail(quote.email, {
       quoteId: quote.id,
       fileName: quote.fileName,
       material: quote.material,
@@ -80,8 +80,12 @@ export async function POST(
       validUntil: quote.validUntil,
     });
 
+    if (!customerEmailResult.success) {
+      console.error('Failed to send customer confirmation email:', customerEmailResult.error);
+    }
+
     // Send notification to admin
-    await sendAdminOrderNotification({
+    const adminEmailResult = await sendAdminOrderNotification({
       quoteId: quote.id,
       customerEmail: quote.email,
       fileName: quote.fileName,
@@ -94,6 +98,10 @@ export async function POST(
       volume: quote.volume,
       boundingBox: quote.boundingBox,
     });
+
+    if (!adminEmailResult.success) {
+      console.error('Failed to send admin notification email:', adminEmailResult.error);
+    }
 
     return NextResponse.json({
       success: true,

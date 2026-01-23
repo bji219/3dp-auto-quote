@@ -8,7 +8,7 @@ import crypto from 'crypto';
 export const VERIFICATION_CONFIG = {
   CODE_LENGTH: 6,
   CODE_EXPIRY_MINUTES: 15,
-  MAX_ATTEMPTS_PER_HOUR: 3,
+  MAX_ATTEMPTS_PER_HOUR: 10,
   SESSION_EXPIRY_HOURS: 24,
   JWT_SECRET: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
 };
@@ -127,10 +127,11 @@ export async function checkRateLimit(
 }> {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  // Count attempts in the last hour
+  // Count FAILED attempts in the last hour (successful ones don't count towards limit)
   const attempts = await prisma.verificationAttempt.count({
     where: {
       email,
+      successful: false,
       createdAt: {
         gte: oneHourAgo,
       },

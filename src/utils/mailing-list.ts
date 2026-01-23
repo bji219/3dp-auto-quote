@@ -37,7 +37,7 @@ export async function subscribeToMailingList(
           subscribedAt: new Date(),
           unsubscribedAt: null,
           source: options?.source || existing.source,
-          tags: options?.tags ? JSON.parse(JSON.stringify(options.tags)) : existing.tags,
+          tags: options?.tags ? JSON.stringify(options.tags) : existing.tags,
         },
       });
 
@@ -54,7 +54,7 @@ export async function subscribeToMailingList(
         email,
         isSubscribed: true,
         source: options?.source || 'manual',
-        tags: options?.tags ? JSON.parse(JSON.stringify(options.tags)) : null,
+        tags: options?.tags ? JSON.stringify(options.tags) : null,
       },
     });
 
@@ -160,7 +160,7 @@ export async function updateSubscriberTags(
     await prisma.mailingListSubscriber.update({
       where: { email },
       data: {
-        tags: JSON.parse(JSON.stringify(tags)),
+        tags: JSON.stringify(tags),
       },
     });
 
@@ -199,18 +199,22 @@ export async function addSubscriberTags(
       };
     }
 
-    // Normalize tags: handle string | null by converting to array
-    const existingTags: string[] = subscriber.tags
-      ? (typeof subscriber.tags === 'string'
-          ? subscriber.tags.split(',').map(t => t.trim()).filter(Boolean)
-          : [])
-      : [];
+    // Normalize tags: handle JSON string | null by converting to array
+    let existingTags: string[] = [];
+    if (subscriber.tags) {
+      try {
+        existingTags = JSON.parse(subscriber.tags);
+      } catch {
+        // If not valid JSON, treat as comma-separated
+        existingTags = subscriber.tags.split(',').map(t => t.trim()).filter(Boolean);
+      }
+    }
     const combinedTags = Array.from(new Set([...existingTags, ...newTags]));
 
     await prisma.mailingListSubscriber.update({
       where: { email },
       data: {
-        tags: JSON.parse(JSON.stringify(combinedTags)),
+        tags: JSON.stringify(combinedTags),
       },
     });
 
