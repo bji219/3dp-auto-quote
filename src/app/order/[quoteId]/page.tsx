@@ -55,19 +55,29 @@ export default function OrderPage() {
     setError('');
 
     try {
-      const response = await fetch(`/api/order/${quoteId}`, {
+      // Create Stripe Checkout session
+      const response = await fetch('/api/checkout', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ quoteId }),
       });
+
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to place order');
+        throw new Error(data.message || 'Failed to create checkout session');
       }
 
-      setOrderSuccess(true);
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to place order');
-    } finally {
+      setError(err instanceof Error ? err.message : 'Failed to initiate checkout');
       setOrdering(false);
     }
   };
@@ -234,11 +244,14 @@ export default function OrderPage() {
                         Processing...
                       </span>
                     ) : (
-                      'Confirm Order'
+                      'Proceed to Payment'
                     )}
                   </button>
                   <p className="text-center text-sm text-gray-500">
-                    By clicking Confirm Order, you agree to our terms of service
+                    By proceeding, you agree to our{' '}
+                    <a href="/terms" target="_blank" className="text-blue-600 hover:underline">
+                      terms of service
+                    </a>
                   </p>
                 </div>
 
