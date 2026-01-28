@@ -70,9 +70,9 @@ export default function ModelPreview({ fileId, fileName, fileDataUrl }: ModelPre
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshPhongMaterial({
-          color: 0x3b82f6,
-          specular: 0x111111,
-          shininess: 200,
+          color: 0xe07040,
+          specular: 0x222222,
+          shininess: 150,
         });
 
         const mesh = new THREE.Mesh(geometry, material);
@@ -133,24 +133,20 @@ export default function ModelPreview({ fileId, fileName, fileDataUrl }: ModelPre
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">
-            3D Model Preview
-          </h3>
-          <p className="text-sm text-gray-600 mt-1 truncate">
-            {fileName}
-          </p>
+      <div className="overflow-hidden rounded-lg bg-white shadow-md">
+        <div className="border-b border-gray-200 p-4">
+          <h3 className="text-lg font-semibold text-gray-800">3D Model Preview</h3>
+          <p className="mt-1 truncate text-sm text-gray-600">{fileName}</p>
         </div>
 
         <div className="relative" style={{ height: '400px' }}>
-          <div ref={containerRef} className="w-full h-full" />
+          <div ref={containerRef} className="h-full w-full" />
 
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
               <div className="text-center">
                 <svg
-                  className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4"
+                  className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-600"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -175,9 +171,9 @@ export default function ModelPreview({ fileId, fileName, fileDataUrl }: ModelPre
 
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-white">
-              <div className="text-center p-6">
+              <div className="p-6 text-center">
                 <svg
-                  className="h-12 w-12 text-red-500 mx-auto mb-4"
+                  className="mx-auto mb-4 h-12 w-12 text-red-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -195,18 +191,28 @@ export default function ModelPreview({ fileId, fileName, fileDataUrl }: ModelPre
           )}
         </div>
 
-        <div className="p-4 bg-gray-50 border-t border-gray-200">
+        <div className="border-t border-gray-200 bg-gray-50 p-4">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <div className="flex items-center space-x-4">
               <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
+                  />
                 </svg>
                 Click and drag to rotate
               </span>
               <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+                  />
                 </svg>
                 Scroll to zoom
               </span>
