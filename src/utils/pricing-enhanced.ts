@@ -139,7 +139,7 @@ export interface DetailedQuote {
 export const MATERIAL_DATABASE: Record<string, MaterialProperties> = {
   PLA: {
     name: 'PLA (Polylactic Acid)',
-    costPerCm3: 0.04, // $0.04 per cm³
+    costPerCm3: 0.05, // $0.05 per cm³
     density: 1.24, // g/cm³
     printSpeed: 12, // cm³/hour
     description: 'Easy to print, biodegradable, great for beginners',
@@ -192,9 +192,9 @@ export const MATERIAL_DATABASE: Record<string, MaterialProperties> = {
  * Default enhanced pricing configuration
  */
 export const DEFAULT_ENHANCED_CONFIG: EnhancedPricingConfig = {
-  baseSetupFee: 5.0,
-  laborRatePerHour: 25.0,
-  machineRatePerHour: 5.0,
+  baseSetupFee: 1.5,
+  laborRatePerHour: 2.5,
+  machineRatePerHour: 1.5,
 
   qualityMultipliers: {
     draft: 0.8,
@@ -207,9 +207,9 @@ export const DEFAULT_ENHANCED_CONFIG: EnhancedPricingConfig = {
   complexityMultiplier: 1.25,
 
   shippingEnabled: true,
-  shippingBaseRate: 5.0,
-  shippingRatePerKg: 2.5,
-  shippingRatePerCm: 0.1,
+  shippingBaseRate: 8.99,
+  shippingRatePerKg: 0.0,
+  shippingRatePerCm: 0.0,
   freeShippingThreshold: 100.0,
 
   volumeDiscounts: [
@@ -268,7 +268,8 @@ export function calculateDetailedQuote(
 
   // Calculate complexity factor
   const complexity = stlData.surfaceArea / stlData.volume;
-  const isComplex = pricingConfig.complexityEnabled && complexity > pricingConfig.complexityThreshold;
+  const isComplex =
+    pricingConfig.complexityEnabled && complexity > pricingConfig.complexityThreshold;
 
   // Calculate print time
   const qualityMultiplier = pricingConfig.qualityMultipliers[quality] || 1.0;
@@ -537,7 +538,9 @@ export function generateQuoteSummary(quote: DetailedQuote): string {
     `  Dimensions: ${quote.model.boundingBox.x} × ${quote.model.boundingBox.y} × ${quote.model.boundingBox.z} cm`
   );
   lines.push(`  Weight: ${quote.model.weight}g`);
-  lines.push(`  Complexity: ${quote.model.complexity.toFixed(2)} (${quote.model.isComplex ? 'Complex' : 'Standard'})\n`);
+  lines.push(
+    `  Complexity: ${quote.model.complexity.toFixed(2)} (${quote.model.isComplex ? 'Complex' : 'Standard'})\n`
+  );
 
   lines.push('MATERIAL & PRINT:');
   lines.push(`  Material: ${quote.material.name}`);
@@ -562,7 +565,9 @@ export function generateQuoteSummary(quote: DetailedQuote): string {
   lines.push(`  Subtotal: ${formatPrice(quote.breakdown.subtotal)}`);
 
   if (quote.discount) {
-    lines.push(`  Discount (${quote.discount.percentage}%): -${formatPrice(quote.discount.amount)}`);
+    lines.push(
+      `  Discount (${quote.discount.percentage}%): -${formatPrice(quote.discount.amount)}`
+    );
   }
 
   if (quote.breakdown.rushOrderFee > 0) {
