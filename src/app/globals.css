@@ -242,3 +242,56 @@ a:hover {
 a.text-blue-600:hover {
   color: var(--accent-amber) !important;
 }
+
+/* ---- Quote tool v2 ---- */
+main {
+  background-color: transparent !important;
+}
+
+.font-heading {
+  font-family: var(--font-syne), 'Syne', sans-serif;
+}
+
+/* Faint drafting grid behind the page, echoing the main site. */
+.blueprint {
+  background-image:
+    linear-gradient(rgba(12, 32, 48, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(12, 32, 48, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.viewer-grid {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(184, 92, 56, 0.16), transparent 62%), #0b2030;
+  cursor: grab;
+}
+.viewer-grid:active {
+  cursor: grabbing;
+}
+
+/* Inputs that sit on the dark price card keep the light field styling. */
+.cta {
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+.cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

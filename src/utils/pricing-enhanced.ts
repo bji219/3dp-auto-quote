@@ -1,69 +1,30 @@
 import { STLData } from '@/types';
+import {
+  MATERIALS,
+  MaterialId,
+  PUBLIC_PRICING,
+  QuoteWarning,
+  analysisFromSummary,
+  buildQuote,
+} from '@/lib/quote-engine';
 
 /**
- * Material Properties with detailed specifications
+ * Server-side adapter: prices an STLData record with the quote engine and
+ * returns the breakdown shape the API routes, emails and database expect.
+ * All rates live in src/lib/quote-engine/config.ts.
  */
-export interface MaterialProperties {
-  name: string;
-  costPerCm3: number; // Cost per cubic centimeter
-  density: number; // g/cm³
-  color?: string;
-  printSpeed: number; // cm³/hour
-  description?: string;
-}
 
-/**
- * Comprehensive pricing configuration
- */
-export interface EnhancedPricingConfig {
-  // Base pricing
-  baseSetupFee: number; // One-time setup fee per order
-  laborRatePerHour: number; // Hourly labor rate
-  machineRatePerHour: number; // Machine operating cost per hour
-
-  // Quality multipliers
-  qualityMultipliers: {
-    draft: number;
-    standard: number;
-    high: number;
-  };
-
-  // Complexity pricing
-  complexityEnabled: boolean;
-  complexityThreshold: number; // Surface area to volume ratio threshold
-  complexityMultiplier: number; // Additional cost for complex models
-
-  // Shipping
-  shippingEnabled: boolean;
-  shippingBaseRate: number; // Base shipping cost
-  shippingRatePerKg: number; // Cost per kilogram
-  shippingRatePerCm: number; // Cost per cm of max dimension
-  freeShippingThreshold: number; // Free shipping above this order value
-
-  // Discounts
-  volumeDiscounts: Array<{
-    minVolume: number;
-    discountPercent: number;
-  }>;
-
-  // Rush order
-  rushOrderMultiplier: number;
-  rushOrderFee: number;
-
-  // Tax
-  taxRate: number; // Tax rate as decimal (e.g., 0.08 for 8%)
-}
-
-/**
- * Itemized cost breakdown
- */
 export interface CostBreakdown {
+  /** Setup fee plus any top-up to the minimum order. */
   setupFee: number;
   materialCost: number;
+  /** Handling for all parts. */
   laborCost: number;
   machineCost: number;
+  /** Support removal for all parts. */
   complexitySurcharge: number;
   shippingCost: number;
+  /** Before discount, rush and tax. */
   subtotal: number;
   discount: number;
   rushOrderFee: number;
@@ -71,535 +32,234 @@ export interface CostBreakdown {
   total: number;
 }
 
-/**
- * Complete quote with all details
- */
 export interface DetailedQuote {
-  // Costs
   breakdown: CostBreakdown;
-
-  // Model details
+  quantity: number;
+  unitPrice: number;
+  orderable: boolean;
+  warnings: QuoteWarning[];
   model: {
     volume: number; // cm³
     surfaceArea: number; // cm²
-    boundingBox: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    weight: number; // grams
-    complexity: number; // Surface area to volume ratio
+    boundingBox: { x: number; y: number; z: number }; // cm
+    /** Printed weight of one part, grams. */
+    weight: number;
+    complexity: number;
     isComplex: boolean;
   };
-
-  // Material details
   material: {
     name: string;
     costPerCm3: number;
     density: number;
-    totalMaterialVolume: number; // Including infill
-    totalMaterialWeight: number; // grams
+    totalMaterialVolume: number; // cm³ extruded, one part
+    totalMaterialWeight: number; // grams, whole order
   };
-
-  // Print details
   print: {
-    estimatedTime: number; // hours
+    /** Hours for the whole order. */
+    estimatedTime: number;
+    hoursPerPart: number;
     quality: string;
     infillPercentage: number;
     rushOrder: boolean;
+    layerHeight: number;
+    orientation: string;
+    needsSupport: boolean;
   };
-
-  // Shipping details (if enabled)
   shipping?: {
-    weight: number; // grams
-    dimensions: {
-      length: number;
-      width: number;
-      height: number;
-    };
+    weight: number;
+    dimensions: { length: number; width: number; height: number };
     cost: number;
     isFree: boolean;
   };
-
-  // Discount details
-  discount?: {
-    type: string;
-    amount: number;
-    percentage: number;
-  };
-
-  // Validity
+  discount?: { type: string; amount: number; percentage: number };
   validUntil: Date;
   createdAt: Date;
 }
 
-/**
- * Material database with detailed properties
- */
-export const MATERIAL_DATABASE: Record<string, MaterialProperties> = {
-  PLA: {
-    name: 'PLA (Polylactic Acid)',
-    costPerCm3: 0.05, // $0.05 per cm³
-    density: 1.24, // g/cm³
-    printSpeed: 12, // cm³/hour
-    description: 'Easy to print, biodegradable, great for beginners',
-  },
-  ABS: {
-    name: 'ABS (Acrylonitrile Butadiene Styrene)',
-    costPerCm3: 0.05,
-    density: 1.04,
-    printSpeed: 10,
-    description: 'Durable, heat-resistant, good for functional parts',
-  },
-  PETG: {
-    name: 'PETG (Polyethylene Terephthalate Glycol)',
-    costPerCm3: 0.06,
-    density: 1.27,
-    printSpeed: 10,
-    description: 'Strong, flexible, chemical resistant',
-  },
-  TPU: {
-    name: 'TPU (Thermoplastic Polyurethane)',
-    costPerCm3: 0.12,
-    density: 1.21,
-    printSpeed: 6,
-    description: 'Flexible, elastic, rubber-like properties',
-  },
-  Nylon: {
-    name: 'Nylon (Polyamide)',
-    costPerCm3: 0.15,
-    density: 1.14,
-    printSpeed: 8,
-    description: 'Very strong, wear-resistant, ideal for mechanical parts',
-  },
-  'Carbon Fiber': {
-    name: 'Carbon Fiber Reinforced',
-    costPerCm3: 0.25,
-    density: 1.3,
-    printSpeed: 7,
-    description: 'Extremely strong, lightweight, premium material',
-  },
-  Resin: {
-    name: 'Resin (Standard)',
-    costPerCm3: 0.18,
-    density: 1.15,
-    printSpeed: 5,
-    description: 'High detail, smooth surface, great for miniatures',
-  },
-};
+export interface DetailedQuoteOptions {
+  material?: string;
+  infillPercentage?: number;
+  quality?: 'draft' | 'standard' | 'high';
+  rushOrder?: boolean;
+  shippingEnabled?: boolean;
+  quantity?: number;
+  unitScale?: number;
+}
 
-/**
- * Default enhanced pricing configuration
- */
-export const DEFAULT_ENHANCED_CONFIG: EnhancedPricingConfig = {
-  baseSetupFee: 1.5,
-  laborRatePerHour: 2.5,
-  machineRatePerHour: 1.5,
+const r2 = (n: number) => Math.round(n * 100) / 100;
 
-  qualityMultipliers: {
-    draft: 0.8,
-    standard: 1.0,
-    high: 1.4,
-  },
-
-  complexityEnabled: true,
-  complexityThreshold: 8.0, // SA/V ratio > 8 is considered complex
-  complexityMultiplier: 1.25,
-
-  shippingEnabled: true,
-  shippingBaseRate: 8.99,
-  shippingRatePerKg: 0.0,
-  shippingRatePerCm: 0.0,
-  freeShippingThreshold: 100.0,
-
-  volumeDiscounts: [
-    { minVolume: 1000, discountPercent: 20 },
-    { minVolume: 500, discountPercent: 15 },
-    { minVolume: 200, discountPercent: 10 },
-    { minVolume: 100, discountPercent: 5 },
-  ],
-
-  rushOrderMultiplier: 1.0,
-  rushOrderFee: 15.0,
-
-  taxRate: 0.0, // No tax by default, can be configured
-};
-
-/**
- * Calculate detailed quote with itemized breakdown
- */
 export function calculateDetailedQuote(
   stlData: STLData,
-  options: {
-    material?: string;
-    infillPercentage?: number;
-    quality?: 'draft' | 'standard' | 'high';
-    rushOrder?: boolean;
-    shippingEnabled?: boolean;
-    config?: Partial<EnhancedPricingConfig>;
-  } = {}
+  options: DetailedQuoteOptions = {}
 ): DetailedQuote {
-  const {
-    material = 'PLA',
-    infillPercentage = 20,
-    quality = 'standard',
-    rushOrder = false,
-    shippingEnabled = true,
-    config = {},
-  } = options;
+  const material = (
+    options.material && options.material in MATERIALS ? options.material : 'PLA'
+  ) as MaterialId;
+  const analysis =
+    stlData.analysis ??
+    analysisFromSummary(stlData.volume * 1000, stlData.surfaceArea * 100, [
+      stlData.boundingBox.x * 10,
+      stlData.boundingBox.y * 10,
+      stlData.boundingBox.z * 10,
+    ]);
 
-  // Merge configuration
-  const pricingConfig: EnhancedPricingConfig = {
-    ...DEFAULT_ENHANCED_CONFIG,
-    ...config,
-  };
+  const q = buildQuote(analysis, {
+    material,
+    quality: options.quality ?? 'standard',
+    infill: options.infillPercentage ?? 15,
+    quantity: options.quantity ?? 1,
+    rush: options.rushOrder ?? false,
+    shipping: options.shippingEnabled ?? true,
+    unitScale: options.unitScale ?? 1,
+  });
+  const { price: p, estimate: e, analysis: a } = q;
+  const mat = MATERIALS[material];
+  const n = p.quantity;
 
-  // Get material properties
-  const materialProps = MATERIAL_DATABASE[material] || MATERIAL_DATABASE.PLA;
-
-  // Calculate infill multiplier (affects material volume)
-  const infillMultiplier = 1 + (infillPercentage / 100) * 0.5;
-
-  // Calculate total material volume needed
-  const totalMaterialVolume = stlData.volume * infillMultiplier;
-
-  // Calculate weight
-  const totalMaterialWeight = totalMaterialVolume * materialProps.density;
-
-  // Calculate complexity factor
-  const complexity = stlData.surfaceArea / stlData.volume;
-  const isComplex =
-    pricingConfig.complexityEnabled && complexity > pricingConfig.complexityThreshold;
-
-  // Calculate print time
-  const qualityMultiplier = pricingConfig.qualityMultipliers[quality] || 1.0;
-  const estimatedPrintTime =
-    (stlData.volume / materialProps.printSpeed) * qualityMultiplier * infillMultiplier;
-
-  // --- COST CALCULATIONS ---
-
-  // 1. Setup fee
-  const setupFee = pricingConfig.baseSetupFee;
-
-  // 2. Material cost
-  const materialCost = totalMaterialVolume * materialProps.costPerCm3;
-
-  // 3. Labor cost
-  const laborCost = estimatedPrintTime * pricingConfig.laborRatePerHour;
-
-  // 4. Machine cost
-  const machineCost = estimatedPrintTime * pricingConfig.machineRatePerHour;
-
-  // 5. Complexity surcharge
-  const complexitySurcharge = isComplex
-    ? (materialCost + laborCost + machineCost) * (pricingConfig.complexityMultiplier - 1)
-    : 0;
-
-  // 6. Subtotal before shipping and discounts
-  let subtotal = setupFee + materialCost + laborCost + machineCost + complexitySurcharge;
-
-  // 7. Shipping cost
-  let shippingCost = 0;
-  let isFreeShipping = false;
-
-  if (shippingEnabled && pricingConfig.shippingEnabled) {
-    if (subtotal >= pricingConfig.freeShippingThreshold) {
-      isFreeShipping = true;
-      shippingCost = 0;
-    } else {
-      const weightKg = totalMaterialWeight / 1000;
-      const maxDimension = Math.max(
-        stlData.boundingBox.x,
-        stlData.boundingBox.y,
-        stlData.boundingBox.z
-      );
-
-      shippingCost =
-        pricingConfig.shippingBaseRate +
-        weightKg * pricingConfig.shippingRatePerKg +
-        maxDimension * pricingConfig.shippingRatePerCm;
-    }
-  }
-
-  // Add shipping to subtotal
-  subtotal += shippingCost;
-
-  // 8. Volume discount
-  let discount = 0;
-  let discountPercentage = 0;
-  let discountType = '';
-
-  for (const tier of pricingConfig.volumeDiscounts) {
-    if (stlData.volume >= tier.minVolume) {
-      discountPercentage = tier.discountPercent;
-      discount = subtotal * (tier.discountPercent / 100);
-      discountType = `Volume discount (${tier.discountPercent}%)`;
-      break;
-    }
-  }
-
-  // 9. Rush order fee
-  let rushOrderFee = 0;
-  if (rushOrder) {
-    rushOrderFee = pricingConfig.rushOrderFee;
-    // Also apply multiplier to labor and machine costs
-    const rushMultiplierIncrease =
-      (laborCost + machineCost) * (pricingConfig.rushOrderMultiplier - 1);
-    rushOrderFee += rushMultiplierIncrease;
-  }
-
-  // 10. Calculate total before tax
-  const totalBeforeTax = subtotal - discount + rushOrderFee;
-
-  // 11. Tax
-  const taxAmount = totalBeforeTax * pricingConfig.taxRate;
-
-  // 12. Final total
-  const total = totalBeforeTax + taxAmount;
-
-  // Build cost breakdown
   const breakdown: CostBreakdown = {
-    setupFee: parseFloat(setupFee.toFixed(2)),
-    materialCost: parseFloat(materialCost.toFixed(2)),
-    laborCost: parseFloat(laborCost.toFixed(2)),
-    machineCost: parseFloat(machineCost.toFixed(2)),
-    complexitySurcharge: parseFloat(complexitySurcharge.toFixed(2)),
-    shippingCost: parseFloat(shippingCost.toFixed(2)),
-    subtotal: parseFloat(subtotal.toFixed(2)),
-    discount: parseFloat(discount.toFixed(2)),
-    rushOrderFee: parseFloat(rushOrderFee.toFixed(2)),
-    taxAmount: parseFloat(taxAmount.toFixed(2)),
-    total: parseFloat(total.toFixed(2)),
+    setupFee: r2(p.setupFee + p.minimumAdjustment),
+    materialCost: r2(p.unit.material * n),
+    laborCost: r2(p.unit.handling * n),
+    machineCost: r2(p.unit.machine * n),
+    complexitySurcharge: r2(p.unit.supportRemoval * n),
+    shippingCost: p.shipping,
+    subtotal: 0,
+    discount: p.discount,
+    rushOrderFee: p.rushFee,
+    taxAmount: p.tax,
+    total: p.total,
   };
+  // Keep the lines summing exactly to the total despite per-line rounding.
+  breakdown.subtotal = r2(p.total - p.tax - p.rushFee + p.discount);
+  breakdown.laborCost = r2(
+    breakdown.subtotal -
+      breakdown.setupFee -
+      breakdown.materialCost -
+      breakdown.machineCost -
+      breakdown.complexitySurcharge -
+      breakdown.shippingCost
+  );
 
-  // Build complete quote
+  const complexity = a.volume > 0 ? a.area / 100 / (a.volume / 1000) : 0;
   const quote: DetailedQuote = {
     breakdown,
-
+    quantity: n,
+    unitPrice: p.unitPrice,
+    orderable: q.orderable,
+    warnings: q.warnings,
     model: {
-      volume: parseFloat(stlData.volume.toFixed(2)),
-      surfaceArea: parseFloat(stlData.surfaceArea.toFixed(2)),
-      boundingBox: {
-        x: parseFloat(stlData.boundingBox.x.toFixed(2)),
-        y: parseFloat(stlData.boundingBox.y.toFixed(2)),
-        z: parseFloat(stlData.boundingBox.z.toFixed(2)),
-      },
-      weight: parseFloat(totalMaterialWeight.toFixed(2)),
-      complexity: parseFloat(complexity.toFixed(2)),
-      isComplex,
+      volume: r2(a.volume / 1000),
+      surfaceArea: r2(a.area / 100),
+      boundingBox: { x: r2(a.size[0] / 10), y: r2(a.size[1] / 10), z: r2(a.size[2] / 10) },
+      weight: r2(e.grams),
+      complexity: r2(complexity),
+      isComplex: e.needsSupport,
     },
-
     material: {
-      name: materialProps.name,
-      costPerCm3: materialProps.costPerCm3,
-      density: materialProps.density,
-      totalMaterialVolume: parseFloat(totalMaterialVolume.toFixed(2)),
-      totalMaterialWeight: parseFloat(totalMaterialWeight.toFixed(2)),
+      name: mat.name,
+      costPerCm3: r2(mat.sellPerGram * mat.density),
+      density: mat.density,
+      totalMaterialVolume: r2(e.volume.total / 1000),
+      totalMaterialWeight: r2(p.totalGrams),
     },
-
     print: {
-      estimatedTime: parseFloat(estimatedPrintTime.toFixed(2)),
-      quality,
-      infillPercentage,
-      rushOrder,
+      estimatedTime: r2(p.totalHours),
+      hoursPerPart: r2(e.hours),
+      quality: options.quality ?? 'standard',
+      infillPercentage: options.infillPercentage ?? 15,
+      rushOrder: options.rushOrder ?? false,
+      layerHeight: e.layerHeight,
+      orientation: e.orientation.label,
+      needsSupport: e.needsSupport,
     },
-
-    validUntil: getQuoteValidityDate(7),
+    validUntil: getQuoteValidityDate(PUBLIC_PRICING.quoteValidDays),
     createdAt: new Date(),
   };
 
-  // Add shipping details if enabled
-  if (shippingEnabled && pricingConfig.shippingEnabled) {
+  if (options.shippingEnabled ?? true) {
     quote.shipping = {
-      weight: parseFloat(totalMaterialWeight.toFixed(2)),
+      weight: r2(p.totalGrams),
       dimensions: {
-        length: parseFloat(stlData.boundingBox.x.toFixed(2)),
-        width: parseFloat(stlData.boundingBox.y.toFixed(2)),
-        height: parseFloat(stlData.boundingBox.z.toFixed(2)),
+        length: r2(a.size[0] / 10),
+        width: r2(a.size[1] / 10),
+        height: r2(a.size[2] / 10),
       },
-      cost: parseFloat(shippingCost.toFixed(2)),
-      isFree: isFreeShipping,
+      cost: p.shipping,
+      isFree: p.freeShipping,
     };
   }
-
-  // Add discount details if applicable
-  if (discount > 0) {
+  if (p.discount > 0) {
     quote.discount = {
-      type: discountType,
-      amount: parseFloat(discount.toFixed(2)),
-      percentage: discountPercentage,
+      type: `Quantity discount (${p.discountPercent}%)`,
+      amount: p.discount,
+      percentage: p.discountPercent,
     };
   }
-
   return quote;
 }
 
-/**
- * Calculate complexity factor (surface area to volume ratio)
- */
-export function calculateComplexity(stlData: STLData): {
-  ratio: number;
-  level: 'simple' | 'moderate' | 'complex' | 'very complex';
-  description: string;
-} {
-  const ratio = stlData.surfaceArea / stlData.volume;
-
-  let level: 'simple' | 'moderate' | 'complex' | 'very complex';
-  let description: string;
-
-  if (ratio < 5) {
-    level = 'simple';
-    description = 'Simple geometry, easy to print';
-  } else if (ratio < 8) {
-    level = 'moderate';
-    description = 'Moderate complexity';
-  } else if (ratio < 12) {
-    level = 'complex';
-    description = 'Complex geometry, may require supports';
-  } else {
-    level = 'very complex';
-    description = 'Very complex geometry, extensive supports needed';
-  }
-
-  return {
-    ratio: parseFloat(ratio.toFixed(2)),
-    level,
-    description,
-  };
-}
-
-/**
- * Calculate shipping cost based on weight and dimensions
- */
-export function calculateShipping(
-  weight: number, // grams
-  dimensions: { x: number; y: number; z: number }, // cm
-  config: Partial<EnhancedPricingConfig> = {}
-): {
-  cost: number;
-  breakdown: {
-    baseRate: number;
-    weightCharge: number;
-    sizeCharge: number;
-  };
-} {
-  const pricingConfig = { ...DEFAULT_ENHANCED_CONFIG, ...config };
-
-  const weightKg = weight / 1000;
-  const maxDimension = Math.max(dimensions.x, dimensions.y, dimensions.z);
-
-  const baseRate = pricingConfig.shippingBaseRate;
-  const weightCharge = weightKg * pricingConfig.shippingRatePerKg;
-  const sizeCharge = maxDimension * pricingConfig.shippingRatePerCm;
-
-  const cost = baseRate + weightCharge + sizeCharge;
-
-  return {
-    cost: parseFloat(cost.toFixed(2)),
-    breakdown: {
-      baseRate: parseFloat(baseRate.toFixed(2)),
-      weightCharge: parseFloat(weightCharge.toFixed(2)),
-      sizeCharge: parseFloat(sizeCharge.toFixed(2)),
-    },
-  };
-}
-
-/**
- * Format price for display
- */
 export function formatPrice(price: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(price);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(price);
 }
 
-/**
- * Calculate quote validity period
- */
-export function getQuoteValidityDate(days: number = 7): Date {
+export function getQuoteValidityDate(days: number = PUBLIC_PRICING.quoteValidDays): Date {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date;
 }
 
 /**
- * Generate printable quote summary
+ * Everything worth keeping about a quote that the Quote table has no column
+ * for. Stored as extra keys in the `boundingBox` JSON string, alongside x/y/z,
+ * so no migration is needed and older readers are unaffected.
  */
-export function generateQuoteSummary(quote: DetailedQuote): string {
-  const lines: string[] = [];
-
-  lines.push('=== 3D PRINTING QUOTE ===\n');
-
-  lines.push('MODEL DETAILS:');
-  lines.push(`  Volume: ${quote.model.volume} cm³`);
-  lines.push(`  Surface Area: ${quote.model.surfaceArea} cm²`);
-  lines.push(
-    `  Dimensions: ${quote.model.boundingBox.x} × ${quote.model.boundingBox.y} × ${quote.model.boundingBox.z} cm`
-  );
-  lines.push(`  Weight: ${quote.model.weight}g`);
-  lines.push(
-    `  Complexity: ${quote.model.complexity.toFixed(2)} (${quote.model.isComplex ? 'Complex' : 'Standard'})\n`
-  );
-
-  lines.push('MATERIAL & PRINT:');
-  lines.push(`  Material: ${quote.material.name}`);
-  lines.push(`  Quality: ${quote.print.quality}`);
-  lines.push(`  Infill: ${quote.print.infillPercentage}%`);
-  lines.push(`  Estimated Time: ${quote.print.estimatedTime.toFixed(2)} hours\n`);
-
-  lines.push('COST BREAKDOWN:');
-  lines.push(`  Setup Fee: ${formatPrice(quote.breakdown.setupFee)}`);
-  lines.push(`  Material: ${formatPrice(quote.breakdown.materialCost)}`);
-  lines.push(`  Labor: ${formatPrice(quote.breakdown.laborCost)}`);
-  lines.push(`  Machine Time: ${formatPrice(quote.breakdown.machineCost)}`);
-
-  if (quote.breakdown.complexitySurcharge > 0) {
-    lines.push(`  Complexity Surcharge: ${formatPrice(quote.breakdown.complexitySurcharge)}`);
-  }
-
-  if (quote.shipping && quote.breakdown.shippingCost > 0) {
-    lines.push(`  Shipping: ${formatPrice(quote.breakdown.shippingCost)}`);
-  }
-
-  lines.push(`  Subtotal: ${formatPrice(quote.breakdown.subtotal)}`);
-
-  if (quote.discount) {
-    lines.push(
-      `  Discount (${quote.discount.percentage}%): -${formatPrice(quote.discount.amount)}`
-    );
-  }
-
-  if (quote.breakdown.rushOrderFee > 0) {
-    lines.push(`  Rush Order Fee: ${formatPrice(quote.breakdown.rushOrderFee)}`);
-  }
-
-  if (quote.breakdown.taxAmount > 0) {
-    lines.push(`  Tax: ${formatPrice(quote.breakdown.taxAmount)}`);
-  }
-
-  lines.push(`\n  TOTAL: ${formatPrice(quote.breakdown.total)}`);
-
-  lines.push(`\nValid until: ${quote.validUntil.toLocaleDateString()}`);
-
-  return lines.join('\n');
+export interface QuoteMeta {
+  x: number;
+  y: number;
+  z: number;
+  quantity: number;
+  unitPrice: number;
+  gramsPerPart: number;
+  hoursPerPart: number;
+  orientation: string;
+  needsSupport: boolean;
+  breakdown: CostBreakdown;
 }
 
-/**
- * Compare quotes for different materials
- */
-export function compareQuotes(
-  stlData: STLData,
-  materials: string[],
-  options: {
-    infillPercentage?: number;
-    quality?: 'draft' | 'standard' | 'high';
-    rushOrder?: boolean;
-    config?: Partial<EnhancedPricingConfig>;
-  } = {}
-): Array<{ material: string; quote: DetailedQuote }> {
-  return materials.map((material) => ({
-    material,
-    quote: calculateDetailedQuote(stlData, { ...options, material }),
-  }));
+export function encodeQuoteMeta(q: DetailedQuote): string {
+  const meta: QuoteMeta = {
+    ...q.model.boundingBox,
+    quantity: q.quantity,
+    unitPrice: q.unitPrice,
+    gramsPerPart: q.model.weight,
+    hoursPerPart: q.print.hoursPerPart,
+    orientation: q.print.orientation,
+    needsSupport: q.print.needsSupport,
+    breakdown: q.breakdown,
+  };
+  return JSON.stringify(meta);
+}
+
+export function decodeQuoteMeta(boundingBox: string | null | undefined): Partial<QuoteMeta> {
+  if (!boundingBox) return {};
+  try {
+    const v = JSON.parse(boundingBox);
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Human-readable one-liner for order emails: size, quantity, and print plan. */
+export function describeQuoteMeta(boundingBox: string | null | undefined): string {
+  const m = decodeQuoteMeta(boundingBox);
+  if (m.x === undefined) return boundingBox || 'n/a';
+  const mm = (cm: number) => (cm * 10).toFixed(1);
+  const parts = [`${mm(m.x)} × ${mm(m.y ?? 0)} × ${mm(m.z ?? 0)} mm`];
+  if (m.quantity) parts.push(`QTY ${m.quantity}`);
+  if (m.gramsPerPart) parts.push(`${m.gramsPerPart.toFixed(1)} g/part`);
+  if (m.hoursPerPart) parts.push(`${m.hoursPerPart.toFixed(2)} h/part`);
+  if (m.orientation) parts.push(`print ${m.orientation}`);
+  if (m.needsSupport) parts.push('needs supports');
+  return parts.join(' · ');
 }

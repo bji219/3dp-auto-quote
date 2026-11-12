@@ -6,15 +6,11 @@
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
 
-# Redirects for SPA routing
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# No catch-all redirect here: the Next.js plugin routes every page and API
+# route itself, and a "/* -> /index.html" rule can shadow them.
 
-# Security headers
 [[headers]]
   for = "/*"
   [headers.values]

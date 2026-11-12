@@ -1,4 +1,8 @@
+import type { MeshAnalysis } from '@/lib/quote-engine/mesh';
+
 export interface STLData {
+  /** Full geometric analysis (mm). Absent on records saved before the engine rewrite. */
+  analysis?: MeshAnalysis;
   vertices: number;
   triangles: number;
   volume: number; // cubic cm

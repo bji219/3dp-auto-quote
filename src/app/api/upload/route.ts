@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseSTL, validateSTLData } from '@/utils/stl-parser';
-import {
-  saveFileWithMetadata,
-  calculateFileHash,
-  generateFileId
-} from '@/utils/file-storage';
+import { saveFileWithMetadata, calculateFileHash } from '@/utils/file-storage';
 import { prisma } from '@/lib/prisma';
 import { UploadResponse } from '@/types';
 
@@ -112,9 +108,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get request metadata
-    const ipAddress = request.headers.get('x-forwarded-for') ||
-                     request.headers.get('x-real-ip') ||
-                     'unknown';
+    const ipAddress =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 
     // Calculate file hash for deduplication
@@ -164,11 +159,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Convert file to base64 data URL for client-side preview
-    // This avoids serverless storage issues where files don't persist between requests
-    const base64Data = buffer.toString('base64');
-    const fileDataUrl = `data:application/sla;base64,${base64Data}`;
-
     return NextResponse.json<UploadResponse>(
       {
         success: true,
@@ -180,8 +170,7 @@ export async function POST(request: NextRequest) {
           fileName: file.name,
           fileSize: file.size,
           fileHash,
-          stlData,
-          fileDataUrl, // Include base64 data for client-side preview
+          stlData: { ...stlData, analysis: undefined },
         },
       },
       { status: 200 }
@@ -196,7 +185,7 @@ export async function POST(request: NextRequest) {
         STORAGE_TYPE: process.env.STORAGE_TYPE || 'local (default)',
         STORAGE_BASE_PATH: process.env.STORAGE_BASE_PATH || 'default',
         NETLIFY: process.env.NETLIFY || 'false',
-      }
+      },
     });
 
     return NextResponse.json<UploadResponse>(

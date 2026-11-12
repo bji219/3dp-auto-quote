@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/middleware/auth';
 import { parseSTL } from '@/utils/stl-parser-enhanced';
-import { calculateDetailedQuote } from '@/utils/pricing-enhanced';
+import { calculateDetailedQuote, encodeQuoteMeta } from '@/utils/pricing-enhanced';
 import { prisma } from '@/lib/prisma';
 import { sendQuoteEmail } from '@/utils/email-service';
 import { promises as fs } from 'fs';
@@ -16,7 +16,8 @@ export const dynamic = 'force-dynamic';
 const calculateQuoteSchema = z.object({
   fileId: z.string().min(1, 'File ID is required'),
   material: z.string().optional().default('PLA'),
-  infillPercentage: z.number().min(0).max(100).optional().default(20),
+  infillPercentage: z.number().min(0).max(100).optional().default(15),
+  quantity: z.number().int().min(1).max(200).optional().default(1),
   quality: z.enum(['draft', 'standard', 'high']).optional().default('standard'),
   rushOrder: z.boolean().optional().default(false),
   color: z.string().optional(),
@@ -51,7 +52,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { fileId, material, infillPercentage, quality, rushOrder, color } = validation.data;
+    const { fileId, material, infillPercentage, quality, rushOrder, quantity, color } =
+      validation.data;
 
     // Check FileUpload record exists
     const fileRecord = await prisma.fileUpload.findUnique({
@@ -83,9 +85,10 @@ export async function POST(request: NextRequest) {
       stlData = {
         volume: fileRecord.volume,
         surfaceArea: fileRecord.surfaceArea,
-        boundingBox: typeof fileRecord.boundingBox === 'string'
-          ? JSON.parse(fileRecord.boundingBox)
-          : fileRecord.boundingBox as { x: number; y: number; z: number },
+        boundingBox:
+          typeof fileRecord.boundingBox === 'string'
+            ? JSON.parse(fileRecord.boundingBox)
+            : (fileRecord.boundingBox as { x: number; y: number; z: number }),
         estimatedPrintTime: 0,
         // Dummy values for unused properties in pricing calculation
         vertices: 0,
@@ -122,6 +125,7 @@ export async function POST(request: NextRequest) {
       infillPercentage,
       quality,
       rushOrder,
+      quantity,
       shippingEnabled: true,
     });
 
@@ -130,9 +134,8 @@ export async function POST(request: NextRequest) {
     validUntil.setDate(validUntil.getDate() + 7);
 
     // Get request metadata
-    const ipAddress = request.headers.get('x-forwarded-for') ||
-                     request.headers.get('x-real-ip') ||
-                     'unknown';
+    const ipAddress =
+      request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 
     // Save quote to database
@@ -149,11 +152,7 @@ export async function POST(request: NextRequest) {
         // STL metrics
         volume: stlData.volume,
         surfaceArea: stlData.surfaceArea,
-        boundingBox: JSON.stringify({
-          x: stlData.boundingBox.x,
-          y: stlData.boundingBox.y,
-          z: stlData.boundingBox.z,
-        }),
+        boundingBox: encodeQuoteMeta(quote),
 
         // Pricing options
         material,
@@ -165,7 +164,10 @@ export async function POST(request: NextRequest) {
         // Cost breakdown
         baseCost: quote.breakdown.setupFee,
         materialCost: quote.breakdown.materialCost,
-        laborCost: quote.breakdown.laborCost + quote.breakdown.machineCost,
+        laborCost:
+          quote.breakdown.laborCost +
+          quote.breakdown.machineCost +
+          quote.breakdown.complexitySurcharge,
         totalCost: quote.breakdown.total,
 
         // Quote status
@@ -188,7 +190,11 @@ export async function POST(request: NextRequest) {
         totalCost: savedQuote.totalCost,
         validUntil: savedQuote.validUntil,
         breakdown: {
-          estimatedPrice: quote.breakdown.setupFee + quote.breakdown.materialCost + quote.breakdown.laborCost + quote.breakdown.machineCost,
+          estimatedPrice:
+            quote.breakdown.setupFee +
+            quote.breakdown.materialCost +
+            quote.breakdown.laborCost +
+            quote.breakdown.machineCost,
           shippingCost: quote.breakdown.shippingCost,
           rushOrderFee: quote.breakdown.rushOrderFee,
           discount: quote.breakdown.discount,
@@ -208,19 +214,19 @@ export async function POST(request: NextRequest) {
           id: savedQuote.id,
           email: savedQuote.email,
           fileName: savedQuote.fileName,
-          
+
           // Model details
           model: quote.model,
-          
+
           // Material details
           material: quote.material,
-          
+
           // Print details
           print: quote.print,
-          
+
           // Cost breakdown
           breakdown: quote.breakdown,
-          
+
           // Quote metadata
           validUntil: savedQuote.validUntil.toISOString(),
           createdAt: savedQuote.createdAt.toISOString(),
@@ -230,7 +236,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Calculate quote error:', error);
-    
+
     // Handle specific errors
     if (error instanceof Error) {
       if (error.message.includes('Invalid STL')) {
@@ -244,7 +250,7 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    
+
     return NextResponse.json(
       {
         success: false,

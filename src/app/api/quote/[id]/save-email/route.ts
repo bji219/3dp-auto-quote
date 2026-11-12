@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { decodeQuoteMeta } from '@/utils/pricing-enhanced';
 import { sendQuoteEmail } from '@/utils/email-service';
 
 export const runtime = 'nodejs';
@@ -14,10 +15,7 @@ const saveEmailSchema = z.object({
  * POST /api/quote/[id]/save-email
  * Save email to an existing quote and send quote details
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
 
@@ -43,10 +41,7 @@ export async function POST(
     });
 
     if (!quote) {
-      return NextResponse.json(
-        { success: false, message: 'Quote not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: 'Quote not found' }, { status: 404 });
     }
 
     // Update quote with email
@@ -59,6 +54,7 @@ export async function POST(
     });
 
     // Send quote email
+    const b = decodeQuoteMeta(quote.boundingBox).breakdown;
     try {
       await sendQuoteEmail(email, {
         quoteId: quote.id,
@@ -68,11 +64,13 @@ export async function POST(
         totalCost: quote.totalCost,
         validUntil: quote.validUntil,
         breakdown: {
-          estimatedPrice: quote.baseCost + quote.materialCost + quote.laborCost,
-          shippingCost: 0, // Not stored separately in DB
-          rushOrderFee: quote.rushOrder ? quote.totalCost * 0.25 : 0,
-          discount: 0,
-          taxAmount: quote.totalCost * 0.08, // Approximate
+          estimatedPrice: b
+            ? b.subtotal - b.shippingCost
+            : quote.baseCost + quote.materialCost + quote.laborCost,
+          shippingCost: b?.shippingCost ?? 0,
+          rushOrderFee: b?.rushOrderFee ?? 0,
+          discount: b?.discount ?? 0,
+          taxAmount: b?.taxAmount ?? 0,
         },
       });
     } catch (emailError) {
@@ -90,9 +88,6 @@ export async function POST(
     });
   } catch (error) {
     console.error('Save email error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to save email' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, message: 'Failed to save email' }, { status: 500 });
   }
 }

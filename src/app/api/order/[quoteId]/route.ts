@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { describeQuoteMeta } from '@/utils/pricing-enhanced';
 import { sendOrderConfirmationEmail, sendAdminOrderNotification } from '@/utils/email-service';
 
 export const runtime = 'nodejs';
@@ -9,10 +10,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/order/[quoteId]
  * Display order confirmation page (redirect to order page)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { quoteId: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { quoteId: string } }) {
   const { quoteId } = params;
 
   // Redirect to order page
@@ -24,10 +22,7 @@ export async function GET(
  * POST /api/order/[quoteId]
  * Process order and send notifications
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { quoteId: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: { quoteId: string } }) {
   try {
     const { quoteId } = params;
 
@@ -37,10 +32,7 @@ export async function POST(
     });
 
     if (!quote) {
-      return NextResponse.json(
-        { success: false, message: 'Quote not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: 'Quote not found' }, { status: 404 });
     }
 
     // Check if quote is still valid
@@ -66,9 +58,11 @@ export async function POST(
     });
 
     // Get file upload record for additional details
-    const fileUpload = quote.fileId ? await prisma.fileUpload.findFirst({
-      where: { fileId: quote.fileId },
-    }) : null;
+    const fileUpload = quote.fileId
+      ? await prisma.fileUpload.findFirst({
+          where: { fileId: quote.fileId },
+        })
+      : null;
 
     // Send confirmation email to customer
     const customerEmailResult = await sendOrderConfirmationEmail(quote.email, {
@@ -96,7 +90,7 @@ export async function POST(
       rushOrder: quote.rushOrder,
       totalCost: quote.totalCost,
       volume: quote.volume,
-      boundingBox: quote.boundingBox,
+      boundingBox: describeQuoteMeta(quote.boundingBox),
     });
 
     if (!adminEmailResult.success) {

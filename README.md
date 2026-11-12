@@ -2,6 +2,42 @@
 
 A full-stack web application built with Next.js and TypeScript that provides instant quotes for 3D printing projects. Upload STL files, get volume and cost calculations, and receive quotes via email.
 
+## How quoting works (v2)
+
+The price is computed from the mesh, in the browser, the moment a file is dropped. No server or
+database is involved until the customer clicks **Order** or asks for the quote by email.
+
+| Piece                                   | Where                                                 |
+| --------------------------------------- | ----------------------------------------------------- |
+| Every rate, speed and material          | `src/lib/quote-engine/config.ts`                      |
+| STL reading and geometry                | `src/lib/quote-engine/mesh.ts`                        |
+| Plastic and print-time estimate         | `src/lib/quote-engine/estimate.ts`                    |
+| Customer price and internal job costing | `src/lib/quote-engine/price.ts`                       |
+| Customer page                           | `/` (`src/components/Quoter.tsx`)                     |
+| Internal job estimator                  | `/internal` (`src/components/JobEstimator.tsx`)       |
+| Save a quote for ordering               | `POST /api/quotes` (recomputes the price server-side) |
+
+The estimate is physical: wall volume from side-facing area, skin from plan-view area, infill
+from what is left, support from overhangs, each divided by the volumetric flow the printer can
+reach. It tries six orientations and prices the one that fits with least support. See
+`scripts/calibration/` for how it compares with a slicer.
+
+**Set before deploying**
+
+- `INTERNAL_PASSCODE`: gates `/internal`. Without it the page returns 404 in production. It is
+  read at build time, so redeploy after changing it.
+- Check `ACTIVE_PRINTER` and `PUBLIC_PRICING` in `config.ts` against your machine and rates.
+
+**Known gaps**
+
+- Netlify caps uploads near 6 MB. Files are gzipped in the browser first, which covers most
+  binary STLs up to roughly 15 MB; beyond that the customer is told to email the file.
+- With `STORAGE_TYPE=local` on Netlify, uploaded files land in `/tmp` and do not persist. Point
+  `STORAGE_TYPE=s3` at a bucket (Supabase Storage has an S3-compatible endpoint) so ordered
+  files can be retrieved.
+- Quantity and the full price breakdown are stored as extra keys in the `Quote.boundingBox`
+  JSON string to avoid a schema migration.
+
 ## Features
 
 - **STL File Processing**: Parse and analyze both ASCII and Binary STL files
@@ -24,7 +60,7 @@ A full-stack web application built with Next.js and TypeScript that provides ins
 
 ## Project Structure
 
-```
+````
 3dp-auto-quote/
 ├── src/
 │   ├── app/                    # Next.js app directory
@@ -73,19 +109,22 @@ A full-stack web application built with Next.js and TypeScript that provides ins
    ```bash
    git clone <repository-url>
    cd 3dp-auto-quote
-   ```
+````
 
 2. Install dependencies:
+
    ```bash
    npm install
    ```
 
 3. Set up environment variables:
+
    ```bash
    cp .env.example .env
    ```
 
 4. Edit `.env` with your configuration:
+
    ```env
    # For SQLite (development)
    DATABASE_URL="file:./dev.db"
@@ -105,6 +144,7 @@ A full-stack web application built with Next.js and TypeScript that provides ins
    ```
 
 5. Initialize the database:
+
    ```bash
    # Push the schema to the database
    npm run db:push
@@ -114,6 +154,7 @@ A full-stack web application built with Next.js and TypeScript that provides ins
    ```
 
 6. Start the development server:
+
    ```bash
    npm run dev
    ```
@@ -177,11 +218,13 @@ SQLite is configured by default. No additional setup required.
 ## API Endpoints
 
 ### POST /api/upload
+
 Upload and parse STL file.
 
 **Request**: `multipart/form-data` with `file` field
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -200,9 +243,11 @@ Upload and parse STL file.
 ```
 
 ### POST /api/calculate-quote
+
 Calculate quote for a 3D print.
 
 **Request**:
+
 ```json
 {
   "email": "user@example.com",
@@ -218,16 +263,17 @@ Calculate quote for a 3D print.
 ```
 
 **Response**:
+
 ```json
 {
   "success": true,
   "message": "Quote calculated successfully",
   "data": {
     "id": "quote_123",
-    "totalCost": 45.50,
-    "baseCost": 15.00,
-    "materialCost": 18.00,
-    "laborCost": 12.50,
+    "totalCost": 45.5,
+    "baseCost": 15.0,
+    "materialCost": 18.0,
+    "laborCost": 12.5,
     "validUntil": "2024-01-01T00:00:00.000Z",
     "requiresVerification": true
   }
@@ -235,9 +281,11 @@ Calculate quote for a 3D print.
 ```
 
 ### GET /api/verify-email?token=xxx
+
 Verify email address.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -282,16 +330,17 @@ Each quote includes:
 
 Models are automatically analyzed for complexity:
 
-| Surface/Volume Ratio | Level | Surcharge |
-|---------------------|-------|-----------|
-| < 5 | Simple | None |
-| 5-8 | Moderate | None |
-| 8-12 | Complex | 25% |
-| > 12 | Very Complex | 25% |
+| Surface/Volume Ratio | Level        | Surcharge |
+| -------------------- | ------------ | --------- |
+| < 5                  | Simple       | None      |
+| 5-8                  | Moderate     | None      |
+| 8-12                 | Complex      | 25%       |
+| > 12                 | Very Complex | 25%       |
 
 ### Shipping Calculation
 
 Shipping cost based on:
+
 - **Base Rate**: $5.00
 - **Weight**: $2.50 per kg
 - **Size**: $0.10 per cm of max dimension
@@ -324,6 +373,7 @@ const quote = calculateDetailedQuote(stlData, { config: customConfig });
 The enhanced STL parser supports both Binary and ASCII STL formats with robust error handling:
 
 ### Features
+
 - Automatic format detection (Binary vs ASCII)
 - Volume calculation using divergence theorem
 - Surface area calculation using cross product
@@ -335,14 +385,18 @@ The enhanced STL parser supports both Binary and ASCII STL formats with robust e
 - Warnings for edge cases
 
 ### Print Time Estimation
+
 The parser can estimate print time based on:
+
 - Model volume
 - Infill percentage (configurable)
 - Print speed (configurable, default 10 cm³/hour)
 - Overhead for layer changes and travel moves
 
 ### Error Handling
+
 Robust error handling for:
+
 - Empty or invalid files
 - Files too small to be valid STL
 - Corrupted triangle data
@@ -367,6 +421,7 @@ npm run test:coverage
 ```
 
 ### Test Coverage
+
 - Binary STL parsing (various sizes and edge cases)
 - ASCII STL parsing (various formats)
 - Error handling (corrupted files, NaN values, etc.)
@@ -383,6 +438,7 @@ See `src/utils/__tests__/README.md` for detailed testing documentation.
 ### Adjusting Pricing
 
 Edit values in `.env`:
+
 ```env
 BASE_PRICE_PER_CM3=0.15
 MATERIAL_COST_MULTIPLIER=1.2
@@ -394,14 +450,15 @@ Or modify `src/utils/pricing.ts` for advanced pricing logic.
 ### Adding Materials
 
 Add to database via Prisma Studio or seed script:
+
 ```typescript
 await prisma.material.create({
   data: {
     name: 'Custom Material',
     costPerCm3: 0.25,
-    density: 1.20,
+    density: 1.2,
     available: true,
-  }
+  },
 });
 ```
 
@@ -439,4 +496,4 @@ MIT
 
 ## Support
 
-For issues or questions, please open an issue on GitHub. 
+For issues or questions, please open an issue on GitHub.

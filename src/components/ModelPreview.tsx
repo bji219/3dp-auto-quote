@@ -2,224 +2,142 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 interface ModelPreviewProps {
-  fileId: string;
-  fileName: string;
-  fileDataUrl?: string; // Base64 data URL for direct loading (serverless)
+  /** Flat triangle soup, 9 floats per triangle, as returned by parseStl. */
+  triangles: Float32Array;
+  /** Which model axis is "up" on the build plate: [axis, sign]. Defaults to +Z. */
+  up?: [0 | 1 | 2, 1 | -1];
+  className?: string;
 }
 
-export default function ModelPreview({ fileId, fileName, fileDataUrl }: ModelPreviewProps) {
+/** Rotation that takes the chosen model axis to three.js "up" (+Y). */
+function upRotation(up: [0 | 1 | 2, 1 | -1]): THREE.Quaternion {
+  const from = new THREE.Vector3();
+  from.setComponent(up[0], up[1]);
+  return new THREE.Quaternion().setFromUnitVectors(from, new THREE.Vector3(0, 1, 0));
+}
+
+export default function ModelPreview({ triangles, up = [2, 1], className }: ModelPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
+  const [failed, setFailed] = useState(false);
+  const upKey = `${up[0]}:${up[1]}`;
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
     const container = containerRef.current;
-    const width = container.clientWidth;
-    const height = container.clientHeight;
+    if (!container) return;
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      setFailed(true);
+      return;
+    }
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 400;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f5);
-    sceneRef.current = scene;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(triangles, 3));
+    geometry.applyQuaternion(upRotation(up));
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    const box = geometry.boundingBox as THREE.Box3;
+    const size = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    // Sit the part on the plate, centred.
+    geometry.translate(-centre.x, -box.min.y, -centre.z);
 
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
-    camera.position.set(0, 0, 100);
-    cameraRef.current = camera;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.minDistance = 10;
-    controls.maxDistance = 500;
-    controlsRef.current = controls;
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-
-    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight1.position.set(1, 1, 1);
-    scene.add(directionalLight1);
-
-    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
-    directionalLight2.position.set(-1, -1, -1);
-    scene.add(directionalLight2);
-
-    const loader = new STLLoader();
-    // Prefer base64 data URL (works on serverless), fallback to API endpoint
-    const stlPath = fileDataUrl || '/api/files/' + fileId;
-
-    loader.load(
-      stlPath,
-      (geometry) => {
-        geometry.center();
-        geometry.computeVertexNormals();
-
-        const material = new THREE.MeshPhongMaterial({
-          color: 0xe07040,
-          specular: 0x222222,
-          shininess: 150,
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-
-        const box = new THREE.Box3().setFromObject(mesh);
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = camera.fov * (Math.PI / 180);
-        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-        cameraZ *= 1.5;
-
-        camera.position.set(cameraZ, cameraZ, cameraZ);
-        camera.lookAt(0, 0, 0);
-        controls.update();
-
-        setIsLoading(false);
-      },
-      (xhr) => {
-        console.log((xhr.loaded / xhr.total) * 100 + '% loaded');
-      },
-      (error) => {
-        console.error('Error loading STL:', error);
-        setError('Failed to load 3D model');
-        setIsLoading(false);
-      }
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({
+        color: 0xc8643c,
+        roughness: 0.62,
+        metalness: 0.05,
+        flatShading: true,
+      })
     );
+    scene.add(mesh);
 
-    const animate = () => {
-      requestAnimationFrame(animate);
+    const span = Math.max(size.x, size.y, size.z, 1);
+    const plate = Math.max(size.x, size.z) * 1.6 + 20;
+    const step = plate > 400 ? 50 : plate > 80 ? 10 : 5;
+    const cells = Math.max(2, Math.ceil(plate / step));
+    const grid = new THREE.GridHelper(cells * step, cells, 0x5a7284, 0x24394a);
+    scene.add(grid);
+
+    scene.add(new THREE.HemisphereLight(0xfff4e6, 0x0b2030, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 1.6);
+    key.position.set(1, 2, 1.5);
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0x9fc4dd, 0.6);
+    rim.position.set(-2, 1, -1);
+    scene.add(rim);
+
+    const camera = new THREE.PerspectiveCamera(35, width / height, span / 100, span * 50);
+    const dist = (span * 1.25) / Math.tan((camera.fov * Math.PI) / 360);
+    camera.position.set(dist * 0.62, size.y / 2 + dist * 0.42, dist * 0.62);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, size.y / 2, 0);
+    controls.enableDamping = true;
+    controls.minDistance = span * 0.3;
+    controls.maxDistance = span * 12;
+    controls.autoRotate = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    controls.autoRotateSpeed = 0.8;
+    const stopSpin = () => (controls.autoRotate = false);
+    renderer.domElement.addEventListener('pointerdown', stopSpin);
+
+    let frame = 0;
+    const tick = () => {
+      frame = requestAnimationFrame(tick);
       controls.update();
       renderer.render(scene, camera);
     };
-    animate();
+    tick();
 
-    const handleResize = () => {
-      if (!container || !camera || !renderer) return;
-      const newWidth = container.clientWidth;
-      const newHeight = container.clientHeight;
-      camera.aspect = newWidth / newHeight;
+    const observer = new ResizeObserver(() => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (!w || !h) return;
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(newWidth, newHeight);
-    };
-
-    window.addEventListener('resize', handleResize);
+      renderer.setSize(w, h);
+    });
+    observer.observe(container);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      if (rendererRef.current) {
-        container.removeChild(rendererRef.current.domElement);
-        rendererRef.current.dispose();
-      }
-      if (controlsRef.current) {
-        controlsRef.current.dispose();
-      }
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      renderer.domElement.removeEventListener('pointerdown', stopSpin);
+      controls.dispose();
+      geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+      grid.geometry.dispose();
+      renderer.dispose();
+      if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };
-  }, [fileId]);
+    // `up` is captured through upKey so a new array each render does not rebuild the scene.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triangles, upKey]);
 
   return (
-    <div className="w-full">
-      <div className="overflow-hidden rounded-lg bg-white shadow-md">
-        <div className="border-b border-gray-200 p-4">
-          <h3 className="text-lg font-semibold text-gray-800">3D Model Preview</h3>
-          <p className="mt-1 truncate text-sm text-gray-600">{fileName}</p>
-        </div>
-
-        <div className="relative" style={{ height: '400px' }}>
-          <div ref={containerRef} className="h-full w-full" />
-
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
-              <div className="text-center">
-                <svg
-                  className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                <p className="text-sm text-gray-600">Loading 3D model...</p>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white">
-              <div className="p-6 text-center">
-                <svg
-                  className="mx-auto mb-4 h-12 w-12 text-red-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="border-t border-gray-200 bg-gray-50 p-4">
-          <div className="flex items-center justify-between text-xs text-gray-600">
-            <div className="flex items-center space-x-4">
-              <span className="flex items-center">
-                <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                  />
-                </svg>
-                Click and drag to rotate
-              </span>
-              <span className="flex items-center">
-                <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-                  />
-                </svg>
-                Scroll to zoom
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className={className} style={{ position: 'relative' }}>
+      <div
+        ref={containerRef}
+        style={{ position: 'absolute', inset: 0 }}
+        aria-label="3D preview of the uploaded model"
+        role="img"
+      />
+      {failed && (
+        <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-[#a8b2bc]">
+          3D preview is unavailable in this browser. Your quote is unaffected.
+        </p>
+      )}
     </div>
   );
 }

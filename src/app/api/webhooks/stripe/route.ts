@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
+import { describeQuoteMeta } from '@/utils/pricing-enhanced';
 import { sendOrderConfirmationEmail, sendAdminOrderNotification } from '@/utils/email-service';
 
 export const runtime = 'nodejs';
@@ -14,10 +15,7 @@ export async function POST(request: NextRequest) {
   // Initialize Stripe inside the handler to avoid build-time errors
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     console.error('Stripe configuration missing');
-    return NextResponse.json(
-      { error: 'Stripe is not configured' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -28,10 +26,7 @@ export async function POST(request: NextRequest) {
 
   if (!signature) {
     console.error('No Stripe signature found');
-    return NextResponse.json(
-      { error: 'No signature found' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'No signature found' }, { status: 400 });
   }
 
   let event: Stripe.Event;
@@ -76,10 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Error processing webhook:', error);
-    return NextResponse.json(
-      { error: 'Webhook handler failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
 }
 
@@ -148,7 +140,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       rushOrder: quote.rushOrder,
       totalCost: quote.totalCost,
       volume: quote.volume,
-      boundingBox: quote.boundingBox,
+      boundingBox: describeQuoteMeta(quote.boundingBox),
     });
     console.log(`Admin notification sent for quote ${quoteId}`);
   } catch (error) {

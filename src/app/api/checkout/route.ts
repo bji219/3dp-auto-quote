@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
+import { decodeQuoteMeta } from '@/utils/pricing-enhanced';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,18 +37,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!quote) {
-      return NextResponse.json(
-        { success: false, message: 'Quote not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, message: 'Quote not found' }, { status: 404 });
     }
 
     // Check if quote is still valid
     if (new Date() > quote.validUntil) {
-      return NextResponse.json(
-        { success: false, message: 'Quote has expired' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, message: 'Quote has expired' }, { status: 400 });
     }
 
     // Check if already ordered
@@ -57,6 +52,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const qty = decodeQuoteMeta(quote.boundingBox).quantity ?? 1;
 
     // Create Stripe Checkout session
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -68,8 +65,8 @@ export async function POST(request: NextRequest) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `3D Print: ${quote.fileName}`,
-              description: `Material: ${quote.material}, Quality: ${quote.quality}, Infill: ${quote.infillPercentage}%${quote.rushOrder ? ' (Rush Order)' : ''}`,
+              name: `3D Print: ${quote.fileName}${qty > 1 ? ` × ${qty}` : ''}`,
+              description: `Qty: ${qty}, Material: ${quote.material}, Quality: ${quote.quality}, Infill: ${quote.infillPercentage}%${quote.rushOrder ? ' (Rush Order)' : ''}`,
               metadata: {
                 quoteId: quote.id,
                 fileName: quote.fileName,
@@ -108,7 +105,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to create checkout session'
+        message: error instanceof Error ? error.message : 'Failed to create checkout session',
       },
       { status: 500 }
     );
